@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>{{ _('user_dashboard') }} - Nagarik Connect</title>
+
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --primary-color: #2563eb;
+      --secondary-color: #1e40af;
+      --success-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+      --info-color: #06b6d4;
+      --light-color: #f8fafc;
+      --dark-color: #1e293b;
+      --gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 10px;
+      border: 2px solid #f1f5f9;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+    }
+
+    ::-webkit-scrollbar-corner {
+      background: #f1f5f9;
+    }
+
+    /* Firefox Scrollbar */
+    html {
+      scrollbar-width: thin;
+      scrollbar-color: #667eea #f1f5f9;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f8f9fa;
+      color: var(--dark-color);
+      line-height: 1.6;
+    }
+
+    .header {
+      background: linear-gradient(to right, #ff9933, #ffffff, #138808);
+      color: #2c3e50;
+      padding: 0.8rem 0;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+    }
+
+    .header-content {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: nowrap;
+      gap: 1rem;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .brand-logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: 2px solid #2c3e50;
+      box-shadow: var(--shadow-md);
+    }
+
+    .brand-text h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin: 0;
+      color: #2c3e50;
+    }
+
+    .brand-text small {
+      opacity: 0.9;
+      font-size: 0.65rem;
+      color: #444;
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: center;
+      margin-left: auto;
+    }
+
+    .btn-nav {
+      padding: 0.3rem 0.6rem;
+      border-radius: 25px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      border: none;
+      font-size: 0.7rem;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+    }
+
+    .btn-nav:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-primary-nav {
+      background: #2c3e50;
+      color: white;
+      border: 1px solid #2c3e50;
+    }
+
+    .btn-primary-nav:hover {
+      background: #1a252f;
+      color: white;
+      border-color: #1a252f;
+    }
+
+    .announcement-bar {
+      background: var(--dark-color);
+      color: white;
+      padding: 0.75rem 0;
+      text-align: center;
+      font-size: 0.9rem;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .announcement-text {
+      display: inline-block;
+      padding-left: 100%;
+      animation: scroll-left 20s linear infinite;
+    }
+
+    @keyframes scroll-left {
+      0% {
+        transform: translateX(0);
+      }
+      100% {
+        transform: translateX(-100%);
+      }
+    }
+
+    .main-content {
+      padding: 2rem 0;
+    }
+
+    .welcome-section {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-md);
+      border-left: 5px solid #ff9933;
+    }
+
+    .welcome-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--dark-color);
+      margin-bottom: 0.5rem;
+    }
+
+    .welcome-subtitle {
+      color: #6b7280;
+      font-size: 0.9rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 1.5rem;
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+      transition: all 0.3s ease;
+      border: 1px solid rgba(0, 0, 0, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+    }
+
+    .stat-card:nth-child(1)::before {
+      background: #ef4444;
+    }
+
+    .stat-card:nth-child(2)::before {
+      background: #10b981;
+    }
+
+    .stat-card:nth-child(3)::before {
+      background: #3b82f6;
+    }
+
+    .stat-card:nth-child(4)::before {
+      background: #f59e0b;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-10px);
+      box-shadow: var(--shadow-xl);
+    }
+
+    .stat-icon {
+      width: 50px;
+      height: 50px;
+      margin: 0 auto 1rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      color: #000000;
+    }
+
+    .stat-card:nth-child(1) .stat-icon {
+      background: #ef4444;
+    }
+
+    .stat-card:nth-child(2) .stat-icon {
+      background: #10b981;
+    }
+
+    .stat-card:nth-child(3) .stat-icon {
+      background: #3b82f6;
+    }
+
+    .stat-card:nth-child(4) .stat-icon {
+      background: #f59e0b;
+    }
+
+    .stat-number {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #000000;
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-label {
+      color: #000000;
+      font-weight: 500;
+      font-size: 0.85rem;
+    }
+
+    .complaint-form {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-md);
+    }
+
+    .form-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--dark-color);
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+      font-weight: 600;
+      color: var(--dark-color);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .form-control {
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 0.75rem 1rem;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      background: #f9fafb;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: #ff9933;
+      background: white;
+      box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.1);
+    }
+
+    .btn-submit {
+      background: linear-gradient(to right, #ff9933, #138808);
+      color: white;
+      border: none;
+      padding: 0.75rem 2rem;
+      border-radius: 25px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      background: linear-gradient(to right, #e68a2e, #0f6d06);
+    }
+
+    .location-helper {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 8px;
+      padding: 0.75rem;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+      color: #0369a1;
+    }
+
+    .complaints-section {
+      background: white;
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: var(--shadow-md);
+    }
+
+    .section-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--dark-color);
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .table-container {
+      border-radius: 12px;
+      overflow-x: auto;
+      overflow-y: visible;
+      box-shadow: var(--shadow-sm);
+      max-width: 100%;
+    }
+
+    .table {
+      margin: 0;
+      min-width: 1400px;
+      white-space: nowrap;
+    }
+
+    .table thead th {
+      background: linear-gradient(to right, #ff9933, #ffffff, #138808);
+      color: #2c3e50;
+      font-weight: 600;
+      border: none;
+      padding: 0.8rem 0.6rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .table tbody td {
+      padding: 0.8rem 0.6rem;
+      vertical-align: middle;
+      border-color: #f1f5f9;
+      font-size: 0.8rem;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .badge-status-pending { 
+      background: #ff9933;
+      color: white;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .badge-status-inprogress { 
+      background: #ffffff;
+      color: #2c3e50;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 2px solid #2c3e50;
+    }
+
+    .badge-status-resolved { 
+      background: #138808;
+      color: white;
+      padding: 0.4rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 600;
+    }
+
+    .img-thumbnail { 
+      max-width: 80px; 
+      height: auto;
+      border-radius: 8px;
+      border: 2px solid #e5e7eb;
+    }
+
+    .clickable-image {
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .clickable-image:hover { 
+      transform: scale(1.05);
+      box-shadow: var(--shadow-md);
+      border-color: var(--primary-color);
+    }
+
+    .footer {
+      background: linear-gradient(to right, #ff9933, #ffffff, #138808);
+      color: #2c3e50;
+      text-align: center;
+      padding: 2rem 0;
+      margin-top: 3rem;
+      font-weight: 600;
+    }
+
+    .fade-in { 
+      animation: fadeInUp 0.8s ease both; 
+    }
+
+    @keyframes fadeInUp {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-on-scroll {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.6s ease;
+    }
+
+    .animate-on-scroll.animated {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 768px) {
+      .header-content {
+        flex-direction: column;
+        text-align: center;
+      }
+      
+      .nav-buttons {
+        justify-content: center;
+      }
+      
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .table-container {
+        overflow-x: auto;
+      }
+      
+      .welcome-title {
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- Header -->
+<header class="header">
+  <div class="container">
+    <div class="header-content">
+      <div class="brand-section">
+        <img src="{{ url_for('static', filename='images/narendra_modi.jpg') }}" alt="Government Logo" class="brand-logo">
+        <div class="brand-text">
+          <h1>Nagarik Connect</h1>
+          <small>{{ _('integrated_citizen_grievance_redressal') }}</small>
+        </div>
+      </div>
+
+      <nav class="nav-buttons">
+        <a href="{{ url_for('feedback') }}" class="btn-nav btn-primary-nav">
+          <i class="fas fa-comment"></i> {{ _('add_feedback') }}
+        </a>
+        <a href="{{ url_for('logout') }}" class="btn-nav btn-primary-nav">
+          <i class="fas fa-sign-out-alt"></i> {{ _('logout') }}
+        </a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- Announcement -->
+<div class="announcement-bar">
+  <span class="announcement-text">
+    <i class="fas fa-bullhorn"></i> Government of India Initiative: Use Nagarik Connect for faster grievance redressal and transparent complaint tracking.
+  </span>
+</div>
+
+<!-- Main Content -->
+<div class="main-content">
+  <div class="container">
+
+    <!-- Welcome Section -->
+    <div class="welcome-section fade-in">
+      <h1 class="welcome-title">Welcome back, {{ name }}!</h1>
+      <p class="welcome-subtitle">Track your complaints and submit new ones through your personalized dashboard</p>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid fade-in">
+      <div class="stat-card animate-on-scroll">
+        <div class="stat-icon">
+          <i class="fas fa-file-alt"></i>
+        </div>
+        <div class="stat-number">{{ total }}</div>
+        <div class="stat-label">Total Complaints</div>
+      </div>
+      
+      <div class="stat-card animate-on-scroll">
+        <div class="stat-icon">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="stat-number">{{ resolved }}</div>
+        <div class="stat-label">Resolved</div>
+      </div>
+      
+      <div class="stat-card animate-on-scroll">
+        <div class="stat-icon">
+          <i class="fas fa-clock"></i>
+        </div>
+        <div class="stat-number">{{ pending }}</div>
+        <div class="stat-label">Pending</div>
+      </div>
+
+      <div class="stat-card animate-on-scroll">
+        <div class="stat-icon">
+          <i class="fas fa-cog"></i>
+        </div>
+        <div class="stat-number">{{ in_progress }}</div>
+        <div class="stat-label">In Progress</div>
+      </div>
+    </div>
+
+    <!-- Submit Complaint Form -->
+    <div class="complaint-form fade-in animate-on-scroll">
+      <h2 class="form-title">
+        <i class="fas fa-plus-circle"></i>
+        Submit New Complaint
+      </h2>
+
+      <form method="POST" action="{{ url_for('submit_complaint') }}" enctype="multipart/form-data">
+
+        <div class="form-group">
+          <label class="form-label">
+            <i class="fas fa-heading"></i> Complaint Title
+          </label>
+          <input type="text" name="title" class="form-control"
+                 placeholder="Enter a clear, descriptive title for your complaint" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <i class="fas fa-align-left"></i> Description
+          </label>
+          <div class="position-relative">
+            <textarea name="description" id="descriptionField" class="form-control" rows="4"
+                      placeholder="Provide detailed information about your complaint..." required></textarea>
+            <button type="button" class="btn btn-sm btn-primary voice-btn" onclick="toggleVoiceInput()" id="voiceBtn">
+              <i class="fas fa-microphone" id="micIcon"></i>
+            </button>
+          </div>
+          
+          <div class="mt-2">
+            <label class="form-label" style="font-size: 0.85rem;">
+              <i class="fas fa-language"></i> Voice Language:
+            </label>
+            <select id="voiceLanguage" class="form-select form-select-sm" style="max-width: 200px;">
+              <option value="en-IN">English (India)</option>
+              <option value="hi-IN">हिंदी (Hindi)</option>
+              <option value="kn-IN">ಕನ್ನಡ (Kannada)</option>
+              <option value="te-IN">తెలుగు (Telugu)</option>
+              <option value="ta-IN">தமிழ் (Tamil)</option>
+              <option value="mr-IN">मराठी (Marathi)</option>
+              <option value="bn-IN">বাংলা (Bengali)</option>
+              <option value="gu-IN">ગુજરાતી (Gujarati)</option>
+              <option value="ml-IN">മലയാളം (Malayalam)</option>
+              <option value="pa-IN">ਪੰਜਾਬੀ (Punjabi)</option>
+            </select>
+          </div>
+          
+          <div id="voiceStatus" class="mt-2" style="display: none;">
+            <span class="badge bg-danger">
+              <i class="fas fa-microphone blink"></i> Listening... Speak now
+            </span>
+          </div>
+          
+          <small class="text-muted">
+            <i class="fas fa-info-circle"></i> Click the microphone button and speak in your language. Your speech will be converted to text automatically.
+          </small>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <i class="fas fa-camera"></i> Attachment (Optional)
+          </label>
+          <input type="file" name="attachment" accept="image/*,video/*" capture="environment" class="form-control" id="fileInput" />
+          <small class="text-muted">Upload or capture photo/video to support your complaint</small>
+          
+          <div class="mt-2">
+            <button type="button" class="btn btn-sm btn-outline-primary me-2" onclick="capturePhoto()">
+              <i class="fas fa-camera"></i> Take Photo
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-success" onclick="captureVideo()">
+              <i class="fas fa-video"></i> Record Video
+            </button>
+          </div>
+
+          <div id="cameraPreview" class="mt-3" style="display: none;">
+            <video id="videoElement" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
+            <div class="mt-2">
+              <button type="button" class="btn btn-sm btn-success" onclick="takeSnapshot()">
+                <i class="fas fa-camera"></i> Capture
+              </button>
+              <button type="button" class="btn btn-sm btn-danger" onclick="stopCamera()">
+                <i class="fas fa-times"></i> Cancel
+              </button>
+            </div>
+          </div>
+
+          <div id="videoRecordingPreview" class="mt-3" style="display: none;">
+            <video id="recordingElement" autoplay playsinline muted style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
+            <div class="mt-2">
+              <button type="button" class="btn btn-sm btn-danger" id="recordBtn" onclick="startRecording()">
+                <i class="fas fa-circle"></i> Start Recording
+              </button>
+              <button type="button" class="btn btn-sm btn-success" id="stopRecordBtn" onclick="stopRecording()" style="display: none;">
+                <i class="fas fa-stop"></i> Stop Recording
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary" onclick="cancelRecording()">
+                <i class="fas fa-times"></i> Cancel
+              </button>
+            </div>
+            <div id="recordingStatus" class="mt-2 text-danger" style="display: none;">
+              <i class="fas fa-circle blink"></i> Recording...
+            </div>
+          </div>
+
+          <canvas id="canvas" style="display: none;"></canvas>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">
+            <i class="fas fa-map-marker-alt"></i> Location
+          </label>
+          <input type="text" name="location_text" class="form-control"
+                 placeholder="Enter area, landmark, or address" />
+          <input type="hidden" id="location" name="location" />
+          
+          <div class="location-helper">
+            <button type="button" onclick="getLocation()" class="btn btn-sm btn-outline-primary">
+              <i class="fas fa-crosshairs"></i> Use Current Location
+            </button>
+            <span id="location-msg" class="ms-2"></span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit">
+          <i class="fas fa-paper-plane"></i>
+          Submit Complaint
+        </button>
+      </form>
+    </div>
+
+    <!-- Complaints Section -->
+    <div class="complaints-section fade-in animate-on-scroll">
+      <h2 class="section-title">
+        <i class="fas fa-list-alt"></i>
+        Your Complaints
+      </h2>
+
+      <div class="alert alert-info mb-3" style="font-size: 0.85rem;">
+        <i class="fas fa-info-circle"></i> Scroll horizontally to view all complaint details
+      </div>
+
+      <div class="table-container">
+        <table class="table table-hover align-middle">
+          <thead>
+            <tr>
+              <th><i class="fas fa-hashtag"></i> ID</th>
+              <th><i class="fas fa-user"></i> Name</th>
+              <th><i class="fas fa-heading"></i> Title</th>
+              <th><i class="fas fa-building"></i> Department</th>
+              <th><i class="fas fa-align-left"></i> Description</th>
+              <th><i class="fas fa-user-hard-hat"></i> Worker</th>
+              <th><i class="fas fa-phone"></i> Contact</th>
+              <th><i class="fas fa-image"></i> Image</th>
+              <th><i class="fas fa-flag"></i> Status</th>
+              <th><i class="fas fa-tasks"></i> Progress</th>
+              <th><i class="fas fa-comment"></i> Remarks</th>
+              <th><i class="fas fa-map-marker-alt"></i> Location</th>
+              <th><i class="fas fa-calendar"></i> Created</th>
+            </tr>
+          </thead>
+
+      <tbody class="text-center">
+        {% for c in complaints %}
+        <tr>
+          <td>{{ c.user_id }}</td>
+          <td>{{ c.user_name }}</td>
+          <td>{{ c.title }}</td>
+          <td>{{ c.department }}</td>
+          <td>{{ c.description }}</td>
+
+          <td>{{ c.assigned_worker_name or "-" }}</td>
+          <td>{{ c.assigned_worker_phone or "-" }}</td>
+
+          <td>
+            {% if c.image %}
+              <img src="{{ url_for('static', filename='uploads/' ~ c.image) }}"
+                   class="img-thumbnail clickable-image" 
+                   onclick="openImageModal('{{ url_for('static', filename='uploads/' ~ c.image) }}', 'Your Complaint Image')"
+                   style="cursor: pointer;" 
+                   title="Click to view full size" />
+            {% else %}-{% endif %}
+          </td>
+
+          <td>
+            {% if c.status == 'Pending' %}
+              <span class="badge badge-status-pending">{{ _('pending') }}</span>
+            {% elif c.status == 'In Progress' %}
+              <span class="badge badge-status-inprogress">{{ _('in_progress') }}</span>
+            {% else %}
+              <span class="badge badge-status-resolved">{{ _('resolved') }}</span>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if c.admin_image %}
+              <img src="{{ url_for('static', filename='uploads/' ~ c.admin_image) }}"
+                   class="img-thumbnail clickable-image" 
+                   onclick="openImageModal('{{ url_for('static', filename='uploads/' ~ c.admin_image) }}', 'Admin Progress Update')"
+                   style="cursor: pointer;" 
+                   title="Click to view admin progress image" />
+              <br>
+              <small class="text-success">✅ Progress Updated</small>
+            {% else %}
+              <span class="text-muted">No progress image</span>
+            {% endif %}
+          </td>
+
+          <td>{{ c.remarks or '-' }}</td>
+
+          <td>
+            {% if c.latitude and c.longitude %}
+              <a href="https://www.google.com/maps?q={{ c.latitude }},{{ c.longitude }}"
+                 target="_blank" class="btn btn-sm btn-link">
+                📍 {{ _('view_map') }}
+              </a>
+            {% elif c.location %}
+              {{ c.location }}
+            {% else %}-{% endif %}
+          </td>
+
+          <td>{{ c.created_at }}</td>
+        </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Image View Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="imageModalTitle">Image View</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="modalImage" src="" class="img-fluid" style="max-height: 70vh;">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a id="downloadLink" href="" download class="btn btn-primary">📥 Download</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <p>&copy; 2025 Nagarik Connect | {{ _('user_dashboard') }} | Government of India Initiative</p>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+function getLocation() {
+  const msg = document.getElementById("location-msg");
+  msg.innerHTML = "📡 Fetching your location… Please wait.";
+
+  if (!navigator.geolocation) {
+    msg.innerHTML = "❌ Geolocation not supported.";
+    msg.classList.add("text-danger");
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude.toFixed(6);
+      const lng = pos.coords.longitude.toFixed(6);
+
+      document.getElementById("location").value = lat + "," + lng;
+
+      msg.innerHTML = "✅ Location added: " + lat + ", " + lng;
+      msg.classList.add("text-success");
+    },
+    () => {
+      msg.innerHTML = "❌ Unable to access location. Please enable GPS.";
+      msg.classList.add("text-danger");
+    },
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+  );
+}
+
+function openImageModal(imageSrc, title) {
+    document.getElementById('modalImage').src = imageSrc;
+    document.getElementById('imageModalTitle').textContent = title;
+    document.getElementById('downloadLink').href = imageSrc;
+    
+    const imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    imageModal.show();
+}
+
+// Animate on Scroll
+const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px'
+};
+
+const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('animated');
+        }
+    });
+}, observerOptions);
+
+document.querySelectorAll('.animate-on-scroll').forEach(el => {
+    observer.observe(el);
+});
+
+// Counter Animation for Stats
+function animateCounters() {
+    const counters = document.querySelectorAll('.stat-number');
+    counters.forEach(counter => {
+        const target = parseInt(counter.textContent);
+        const increment = target / 50;
+        let current = 0;
+        
+        const updateCounter = () => {
+            if (current < target) {
+                current += increment;
+                counter.textContent = Math.ceil(current);
+                requestAnimationFrame(updateCounter);
+            } else {
+                counter.textContent = target;
+            }
+        };
+        
+        updateCounter();
+    });
+}
+
+// Trigger counter animation when stats section is visible
+const statsSection = document.querySelector('.stats-grid');
+const statsObserver = new IntersectionObserver(function(entries) {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            animateCounters();
+            statsObserver.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.5 });
+
+if (statsSection) {
+    statsObserver.observe(statsSection);
+}
+
+// Camera and Video Capture Functions
+let stream = null;
+let mediaRecorder = null;
+let recordedChunks = [];
+
+async function capturePhoto() {
+    try {
+        document.getElementById('cameraPreview').style.display = 'block';
+        document.getElementById('videoRecordingPreview').style.display = 'none';
+        
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' }, 
+            audio: false 
+        });
+        
+        document.getElementById('videoElement').srcObject = stream;
+    } catch (err) {
+        alert('Error accessing camera: ' + err.message);
+        console.error('Camera error:', err);
+    }
+}
+
+function takeSnapshot() {
+    const video = document.getElementById('videoElement');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    canvas.toBlob(function(blob) {
+        const file = new File([blob], 'captured-photo.jpg', { type: 'image/jpeg' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        document.getElementById('fileInput').files = dataTransfer.files;
+        
+        alert('Photo captured successfully!');
+        stopCamera();
+    }, 'image/jpeg', 0.95);
+}
+
+function stopCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    document.getElementById('cameraPreview').style.display = 'none';
+    document.getElementById('videoElement').srcObject = null;
+}
+
+async function captureVideo() {
+    try {
+        document.getElementById('videoRecordingPreview').style.display = 'block';
+        document.getElementById('cameraPreview').style.display = 'none';
+        
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment' }, 
+            audio: true 
+        });
+        
+        document.getElementById('recordingElement').srcObject = stream;
+        document.getElementById('recordBtn').style.display = 'inline-block';
+        document.getElementById('stopRecordBtn').style.display = 'none';
+    } catch (err) {
+        alert('Error accessing camera/microphone: ' + err.message);
+        console.error('Video capture error:', err);
+    }
+}
+
+function startRecording() {
+    recordedChunks = [];
+    
+    const options = { mimeType: 'video/webm;codecs=vp9' };
+    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+        options.mimeType = 'video/webm';
+    }
+    
+    try {
+        mediaRecorder = new MediaRecorder(stream, options);
+        
+        mediaRecorder.ondataavailable = function(event) {
+            if (event.data.size > 0) {
+                recordedChunks.push(event.data);
+            }
+        };
+        
+        mediaRecorder.onstop = function() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const file = new File([blob], 'recorded-video.webm', { type: 'video/webm' });
+            const dataTransfer = new DataTransfer();
+            dataTransfer.items.add(file);
+            document.getElementById('fileInput').files = dataTransfer.files;
+            
+            alert('Video recorded successfully!');
+            cancelRecording();
+        };
+        
+        mediaRecorder.start();
+        document.getElementById('recordBtn').style.display = 'none';
+        document.getElementById('stopRecordBtn').style.display = 'inline-block';
+        document.getElementById('recordingStatus').style.display = 'block';
+    } catch (err) {
+        alert('Error starting recording: ' + err.message);
+        console.error('Recording error:', err);
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        document.getElementById('recordingStatus').style.display = 'none';
+    }
+}
+
+function cancelRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    document.getElementById('videoRecordingPreview').style.display = 'none';
+    document.getElementById('recordingElement').srcObject = null;
+    document.getElementById('recordingStatus').style.display = 'none';
+    recordedChunks = [];
+}
+
+// Voice-to-Text Speech Recognition
+let recognition = null;
+let isRecording = false;
+
+function initSpeechRecognition() {
+    // Check if browser supports speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+        alert('Speech recognition is not supported in your browser. Please use Chrome, Edge, or Safari.');
+        return null;
+    }
+    
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    
+    recognition.onstart = function() {
+        console.log('Voice recognition started');
+        document.getElementById('voiceStatus').style.display = 'block';
+        document.getElementById('voiceBtn').classList.add('recording');
+        document.getElementById('micIcon').classList.remove('fa-microphone');
+        document.getElementById('micIcon').classList.add('fa-stop');
+    };
+    
+    recognition.onresult = function(event) {
+        let interimTranscript = '';
+        let finalTranscript = '';
+        
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+                finalTranscript += transcript + ' ';
+            } else {
+                interimTranscript += transcript;
+            }
+        }
+        
+        const descriptionField = document.getElementById('descriptionField');
+        if (finalTranscript) {
+            // Append final transcript to existing text
+            const currentText = descriptionField.value;
+            descriptionField.value = currentText + (currentText ? ' ' : '') + finalTranscript;
+        }
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        let errorMessage = 'Error: ';
+        
+        switch(event.error) {
+            case 'no-speech':
+                errorMessage += 'No speech detected. Please try again.';
+                break;
+            case 'audio-capture':
+                errorMessage += 'Microphone not found or not accessible.';
+                break;
+            case 'not-allowed':
+                errorMessage += 'Microphone permission denied. Please allow microphone access.';
+                break;
+            default:
+                errorMessage += event.error;
+        }
+        
+        alert(errorMessage);
+        stopVoiceInput();
+    };
+    
+    recognition.onend = function() {
+        console.log('Voice recognition ended');
+        if (isRecording) {
+            // Restart if still in recording mode
+            try {
+                recognition.start();
+            } catch (e) {
+                console.log('Recognition restart failed:', e);
+                stopVoiceInput();
+            }
+        } else {
+            stopVoiceInput();
+        }
+    };
+    
+    return recognition;
+}
+
+function toggleVoiceInput() {
+    if (!recognition) {
+        recognition = initSpeechRecognition();
+        if (!recognition) return;
+    }
+    
+    if (isRecording) {
+        stopVoiceInput();
+    } else {
+        startVoiceInput();
+    }
+}
+
+function startVoiceInput() {
+    const selectedLanguage = document.getElementById('voiceLanguage').value;
+    recognition.lang = selectedLanguage;
+    
+    try {
+        recognition.start();
+        isRecording = true;
+    } catch (e) {
+        console.error('Error starting recognition:', e);
+        alert('Could not start voice recognition. Please try again.');
+    }
+}
+
+function stopVoiceInput() {
+    if (recognition) {
+        try {
+            recognition.stop();
+        } catch (e) {
+            console.log('Recognition already stopped');
+        }
+    }
+    
+    isRecording = false;
+    document.getElementById('voiceStatus').style.display = 'none';
+    document.getElementById('voiceBtn').classList.remove('recording');
+    document.getElementById('micIcon').classList.remove('fa-stop');
+    document.getElementById('micIcon').classList.add('fa-microphone');
+}
+
+// Initialize speech recognition on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if speech recognition is supported
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        document.getElementById('voiceBtn').disabled = true;
+        document.getElementById('voiceBtn').title = 'Speech recognition not supported in this browser';
+    }
+});
+</script>
+
+<style>
+@keyframes blink {
+    0%, 50%, 100% { opacity: 1; }
+    25%, 75% { opacity: 0; }
+}
+.blink {
+    animation: blink 1.5s infinite;
+}
+
+.voice-btn {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: all 0.3s ease;
+}
+
+.voice-btn:hover {
+    transform: scale(1.1);
+}
+
+.voice-btn.recording {
+    background: #ef4444 !important;
+    border-color: #ef4444 !important;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+}
+</style>
+
+</body>
+</html>

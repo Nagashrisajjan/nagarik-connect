@@ -1,0 +1,180 @@
+═══════════════════════════════════════════════════════════════════
+    🗄️ MONGODB ATLAS - QUICK SETUP (10 MINUTES)
+═══════════════════════════════════════════════════════════════════
+
+STEP 1: CREATE ACCOUNT (2 minutes)
+═══════════════════════════════════════════════════════════════════
+1. Go to: https://www.mongodb.com/cloud/atlas/register
+2. Click "Sign up with Google" (fastest)
+   OR
+   Enter email + password + name
+3. Verify email if needed
+4. Complete welcome survey (optional)
+
+═══════════════════════════════════════════════════════════════════
+STEP 2: CREATE FREE CLUSTER (3 minutes)
+═══════════════════════════════════════════════════════════════════
+1. You'll see "Deploy a cloud database"
+2. Click on "M0 FREE" (the free tier box)
+3. Choose:
+   - Provider: AWS (recommended)
+   - Region: Mumbai (for India) or closest to you
+   - Cluster Name: Cluster0 (or your choice)
+4. Click "Create"
+5. Wait 1-3 minutes (cluster is being created)
+
+═══════════════════════════════════════════════════════════════════
+STEP 3: CREATE DATABASE USER (2 minutes)
+═══════════════════════════════════════════════════════════════════
+You'll see "Security Quickstart" popup:
+
+1. Username and Password section:
+   - Username: icgs_admin (or your choice)
+   - Click "Autogenerate Secure Password"
+   - 🚨 COPY THE PASSWORD NOW! 🚨
+   
+   Example:
+   Username: icgs_admin
+   Password: xK9mP2nQ7vL5wR8t
+   
+   📝 WRITE IT DOWN HERE:
+   ┌─────────────────────────────────────────────────────────────┐
+   │ Username: _____________________________________________     │
+   │                                                             │
+   │ Password: _____________________________________________     │
+   └─────────────────────────────────────────────────────────────┘
+
+2. Click "Create User"
+
+═══════════════════════════════════════════════════════════════════
+STEP 4: CONFIGURE NETWORK ACCESS (1 minute)
+═══════════════════════════════════════════════════════════════════
+Still in the popup:
+
+1. Click "Add a Different IP Address"
+2. In IP Address field, type: 0.0.0.0/0
+3. Description: Allow all IPs
+4. Click "Add Entry"
+5. Click "Finish and Close"
+
+═══════════════════════════════════════════════════════════════════
+STEP 5: GET CONNECTION STRING (2 minutes)
+═══════════════════════════════════════════════════════════════════
+1. Click "Database" in left sidebar
+2. Click "Connect" button on your cluster
+3. Click "Connect your application"
+4. Select:
+   - Driver: Python
+   - Version: 3.12 or later
+5. Copy the connection string (looks like):
+   
+   mongodb+srv://icgs_admin:<password>@cluster0.xxxxx.mongodb.net/?retryWrites=true&w=majority
+
+6. Extract these 3 values:
+   
+   📝 WRITE THEM DOWN:
+   ┌─────────────────────────────────────────────────────────────┐
+   │ Username: icgs_admin                                        │
+   │                                                             │
+   │ Password: xK9mP2nQ7vL5wR8t                                  │
+   │                                                             │
+   │ Cluster:  cluster0.xxxxx.mongodb.net                       │
+   └─────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+STEP 6: UPDATE YOUR CONFIG FILE
+═══════════════════════════════════════════════════════════════════
+1. Open: icgs_project3/config.py
+
+2. Find these lines:
+   MONGODB_USERNAME = os.environ.get('MONGODB_USERNAME', 'your_username')
+   MONGODB_PASSWORD = os.environ.get('MONGODB_PASSWORD', 'your_password')
+   MONGODB_CLUSTER = os.environ.get('MONGODB_CLUSTER', 'cluster0.xxxxx.mongodb.net')
+
+3. Replace with YOUR values:
+   MONGODB_USERNAME = os.environ.get('MONGODB_USERNAME', 'icgs_admin')
+   MONGODB_PASSWORD = os.environ.get('MONGODB_PASSWORD', 'xK9mP2nQ7vL5wR8t')
+   MONGODB_CLUSTER = os.environ.get('MONGODB_CLUSTER', 'cluster0.abc123.mongodb.net')
+
+4. Save the file
+
+═══════════════════════════════════════════════════════════════════
+STEP 7: TEST CONNECTION (OPTIONAL)
+═══════════════════════════════════════════════════════════════════
+Run these commands:
+
+cd icgs_project3
+pip install pymongo dnspython
+python -c "from pymongo import MongoClient; from config import Config; client = MongoClient(Config.get_mongodb_uri()); client.server_info(); print('✅ Connected!')"
+
+Expected output: ✅ Connected!
+
+═══════════════════════════════════════════════════════════════════
+STEP 8: MIGRATE YOUR DATA
+═══════════════════════════════════════════════════════════════════
+Run this command:
+
+python migrate_to_mongodb.py
+
+Expected output:
+🚀 Starting migration...
+✅ Connected to MySQL
+✅ Connected to MongoDB Atlas
+✅ Migrated X users
+✅ Migrated X complaints
+✅ Migrated X workers
+🎉 Migration completed!
+
+═══════════════════════════════════════════════════════════════════
+STEP 9: VERIFY IN MONGODB ATLAS
+═══════════════════════════════════════════════════════════════════
+1. Go back to MongoDB Atlas website
+2. Click "Database" → "Browse Collections"
+3. You should see:
+   - Database: icgs_complaints
+   - Collections: users, complaints, workers, dept_admins, feedback
+
+═══════════════════════════════════════════════════════════════════
+✅ DONE! YOUR MONGODB ATLAS IS READY!
+═══════════════════════════════════════════════════════════════════
+
+Next step: Deploy to Render
+Read: DEPLOYMENT_GUIDE.md
+
+═══════════════════════════════════════════════════════════════════
+🆘 TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════
+
+Problem: "Authentication failed"
+→ Double-check username and password in config.py
+
+Problem: "Connection timeout"
+→ Check Network Access in MongoDB Atlas (should be 0.0.0.0/0)
+
+Problem: "Server selection timeout"
+→ Wait 2-3 minutes, cluster might still be starting
+
+Problem: "IP not whitelisted"
+→ Add 0.0.0.0/0 in Network Access settings
+
+═══════════════════════════════════════════════════════════════════
+📋 CREDENTIALS REFERENCE CARD (SAVE THIS!)
+═══════════════════════════════════════════════════════════════════
+
+MongoDB Atlas Credentials:
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│  Username: _________________________________________________   │
+│                                                                 │
+│  Password: _________________________________________________   │
+│                                                                 │
+│  Cluster:  _________________________________________________   │
+│                                                                 │
+│  Database: icgs_complaints                                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+Keep this information secure!
+You'll need it for deployment.
+
+═══════════════════════════════════════════════════════════════════

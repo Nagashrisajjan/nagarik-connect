@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ _('feedback') }} - Nagarik Connect</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 10px;
+      border: 2px solid #f1f5f9;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+    }
+
+    ::-webkit-scrollbar-corner {
+      background: #f1f5f9;
+    }
+
+    /* Firefox Scrollbar */
+    html {
+      scrollbar-width: thin;
+      scrollbar-color: #667eea #f1f5f9;
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+<header class="p-3 d-flex justify-content-between align-items-center"
+        style="background: linear-gradient(to right, #ff9933, #ffffff, #138808);">
+  <h4>Nagarik Connect - {{ _('feedback') }}</h4>
+  <a href="{{ url_for('user_dashboard') }}" class="btn btn-dark">{{ _('back_to_dashboard') }}</a>
+</header>
+
+<div class="container my-4">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{category}}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <h2 class="mb-3">{{ _('submit_feedback') }}</h2>
+  <form method="POST" enctype="multipart/form-data" class="card p-3 shadow-sm mb-4">
+    <div class="mb-3">
+      <label>{{ _('title') }}</label>
+      <input type="text" name="title" class="form-control" required>
+    </div>
+    <div class="mb-3">
+      <label>{{ _('message') }}</label>
+      <textarea name="message" class="form-control" required></textarea>
+    </div>
+
+    <div class="mb-3">
+      <label>{{ _('select_complaint_optional') }}</label>
+      <select name="complaint_id" class="form-select">
+        <option value="">{{ _('general_feedback') }}</option>
+        {% for c in complaints %}
+          <option value="{{ c.id }}">{{ c.title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label>{{ _('rating') }}</label>
+      <select name="rating" class="form-select" required>
+        <option value="">-- {{ _('choose_rating') }} --</option>
+        {% for i in range(1,6) %}
+          <option value="{{ i }}">{{ i }} ⭐</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label>{{ _('image_optional') }}</label>
+      <input type="file" name="image" accept="image/*" class="form-control">
+    </div>
+
+    <button type="submit" class="btn btn-warning">{{ _('submit_button') }}</button>
+  </form>
+
+  <h2 class="mb-3">{{ _('your_feedbacks') }}</h2>
+  <div class="table-responsive">
+    <table class="table table-bordered bg-white">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>{{ _('title') }}</th>
+          <th>{{ _('message') }}</th>
+          <th>{{ _('rating') }}</th>
+          <th>{{ _('complaint') }}</th>
+          <th>{{ _('admin_reply') }}</th>
+          <th>{{ _('created_at') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in feedbacks %}
+        <tr>
+          <td>{{ f.id }}</td>
+          <td>{{ f.title }}</td>
+          <td>{{ f.message }}</td>
+          <td>{{ f.rating }}⭐</td>
+          <td>{{ f.complaint_title or _('general_feedback') }}</td>
+          <td>{{ f.admin_reply or '-' }}</td>
+          <td>{{ f.created_at }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer class="bg-dark text-white text-center py-3 mt-4">
+  © 2025 Nagarik Connect | {{ _('feedback_section') }}
+</footer>
+
+</body>
+</html>

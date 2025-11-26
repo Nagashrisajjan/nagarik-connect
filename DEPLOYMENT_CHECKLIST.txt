@@ -1,0 +1,123 @@
+═══════════════════════════════════════════════════════════
+    🚀 NAGARIK CONNECT - DEPLOYMENT CHECKLIST
+═══════════════════════════════════════════════════════════
+
+PHASE 1: SETUP MONGODB ATLAS (5 minutes)
+═══════════════════════════════════════════════════════════
+[ ] 1. Go to https://www.mongodb.com/cloud/atlas/register
+[ ] 2. Create free account
+[ ] 3. Create new cluster (M0 - Free tier)
+[ ] 4. Wait for cluster creation (2-3 minutes)
+[ ] 5. Click "Database Access" → Add Database User
+    Username: ________________
+    Password: ________________ (SAVE THIS!)
+[ ] 6. Click "Network Access" → Add IP Address → Allow 0.0.0.0/0
+[ ] 7. Click "Database" → Connect → Connection String
+    Cluster URL: ________________.mongodb.net
+
+═══════════════════════════════════════════════════════════
+PHASE 2: MIGRATE DATA (2 minutes)
+═══════════════════════════════════════════════════════════
+[ ] 1. Open config.py
+[ ] 2. Update MongoDB credentials:
+    MONGODB_USERNAME = 'your_username'
+    MONGODB_PASSWORD = 'your_password'
+    MONGODB_CLUSTER = 'cluster0.xxxxx.mongodb.net'
+[ ] 3. Run migration:
+    pip install pymongo dnspython
+    python migrate_to_mongodb.py
+[ ] 4. Verify success message
+
+═══════════════════════════════════════════════════════════
+PHASE 3: PUSH TO GITHUB (3 minutes)
+═══════════════════════════════════════════════════════════
+[ ] 1. Create new repository on GitHub
+    Repository name: ________________
+[ ] 2. Run commands:
+    git init
+    git add .
+    git commit -m "Initial deployment"
+    git remote add origin YOUR_REPO_URL
+    git push -u origin main
+[ ] 3. Verify files uploaded to GitHub
+
+═══════════════════════════════════════════════════════════
+PHASE 4: DEPLOY TO RENDER (5 minutes)
+═══════════════════════════════════════════════════════════
+[ ] 1. Go to https://render.com
+[ ] 2. Sign up with GitHub
+[ ] 3. Click "New +" → "Web Service"
+[ ] 4. Connect your GitHub repository
+[ ] 5. Configure:
+    Name: nagarik-connect
+    Environment: Python 3
+    Build Command: pip install -r requirements.txt
+    Start Command: gunicorn app:app
+    Instance Type: Free
+[ ] 6. Add Environment Variables:
+    MONGODB_USERNAME = ________________
+    MONGODB_PASSWORD = ________________
+    MONGODB_CLUSTER = ________________
+    MONGODB_DATABASE = icgs_complaints
+    SECRET_KEY = ________________ (random string)
+    PYTHON_VERSION = 3.11.0
+[ ] 7. Click "Create Web Service"
+[ ] 8. Wait for deployment (5-10 minutes)
+[ ] 9. Copy your live URL: ________________.onrender.com
+
+═══════════════════════════════════════════════════════════
+PHASE 5: TEST DEPLOYMENT (3 minutes)
+═══════════════════════════════════════════════════════════
+[ ] 1. Visit your Render URL
+[ ] 2. Test user registration
+[ ] 3. Test user login
+[ ] 4. Submit a test complaint
+[ ] 5. Test admin login (if applicable)
+[ ] 6. Check admin dashboard
+[ ] 7. Verify complaint appears in dashboard
+
+═══════════════════════════════════════════════════════════
+TROUBLESHOOTING
+═══════════════════════════════════════════════════════════
+If deployment fails:
+[ ] Check Render logs (Dashboard → Logs tab)
+[ ] Verify all environment variables are set correctly
+[ ] Ensure MongoDB Atlas network access is 0.0.0.0/0
+[ ] Check MongoDB credentials are correct
+[ ] Verify requirements.txt is in root directory
+
+═══════════════════════════════════════════════════════════
+SUCCESS! 🎉
+═══════════════════════════════════════════════════════════
+Your app is live at: ________________.onrender.com
+
+Share this URL with users!
+
+═══════════════════════════════════════════════════════════
+IMPORTANT NOTES
+═══════════════════════════════════════════════════════════
+✓ Free tier apps sleep after 15 minutes of inactivity
+✓ First request after sleep takes 30-60 seconds to wake up
+✓ MongoDB Atlas free tier has 512MB storage limit
+✓ Uploaded files may be lost on app restart (use Cloudinary for production)
+✓ Keep your MongoDB credentials secure
+✓ Never commit .env file to GitHub
+
+═══════════════════════════════════════════════════════════
+NEXT STEPS (OPTIONAL)
+═══════════════════════════════════════════════════════════
+[ ] Setup custom domain
+[ ] Configure Cloudinary for image storage
+[ ] Add SendGrid for email notifications
+[ ] Setup monitoring and alerts
+[ ] Upgrade to paid tier for better performance
+
+═══════════════════════════════════════════════════════════
+SUPPORT
+═══════════════════════════════════════════════════════════
+For detailed instructions, see:
+- QUICK_DEPLOY.md (5-minute guide)
+- DEPLOYMENT_GUIDE.md (complete guide)
+- API_CONFIGURATION.md (all APIs and configs)
+
+═══════════════════════════════════════════════════════════
