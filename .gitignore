@@ -53,9 +53,3 @@ Thumbs.db
 # Uploads (optional - remove if you want to keep uploads in git)
 # static/uploads/*
 # !static/uploads/.gitkeep
-
-# ML Models (too large for GitHub)
-ml/model/*.safetensors
-ml/model/*.bin
-ml/worker_model/*.safetensors
-ml/worker_model/*.bin
