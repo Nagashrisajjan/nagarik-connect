@@ -5,12 +5,32 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime
 import os
-from ml.router import predict_department, predict_worker
+# ML imports - made optional to reduce memory usage
+try:
+    from ml.router import predict_department, predict_worker
+    ML_AVAILABLE = True
+except Exception as e:
+    print(f"ML models not available: {e}")
+    ML_AVAILABLE = False
+    def predict_department(title, description):
+        # Fallback: simple keyword-based department prediction
+        text = (title + " " + description).lower()
+        if "water" in text or "drinking" in text:
+            return "Water Crisis"
+        elif "road" in text or "pothole" in text:
+            return "Road Maintenance(Engg)"
+        elif "garbage" in text or "waste" in text:
+            return "Solid Waste (Garbage) Related"
+        elif "electric" in text or "power" in text:
+            return "Electrical"
+        else:
+            return "General Department"
+    def predict_worker(title, description):
+        return None
 from flask_babel import Babel
 from translations import translations
 
-# ---- ML router ----
-from ml.router import predict_department
+# ML router already imported above with fallback
 
 # ---- APP CONFIG ----
 app = Flask(__name__)
@@ -994,4 +1014,5 @@ def dept_admin_feedback():
 
 # ---- RUN APP ----
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
