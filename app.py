@@ -36,18 +36,16 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 def allowed_file(filename):
     return True
+
 # ---- DATABASE CONNECTION ----
-# Database connection handled by database.py,
-        user=os.environ.get('MYSQL_USER', 'root'),
-        password=os.environ.get('MYSQL_PASSWORD', ''),
-        database=os.environ.get('MYSQL_DATABASE', 'updatedicgs')
-    )
+# Database connection handled by database.py
 
 def get_workers():
     db = get_db()
     workers = list(db.workers.find())
-        for w in workers:
-            w["id"] = str(w["_id"])
+    for w in workers:
+        w["id"] = str(w["_id"])
+    return workers
     return workers
 
 
