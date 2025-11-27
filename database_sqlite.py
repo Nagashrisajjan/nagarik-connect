@@ -101,8 +101,67 @@ def init_db():
         conn.commit()
         print("✅ SQLite database initialized successfully!")
 
+def create_default_dept_admins():
+    """Create default department admin accounts if they don't exist"""
+    from werkzeug.security import generate_password_hash
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Check if admins already exist
+        cursor.execute("SELECT COUNT(*) FROM dept_admins")
+        count = cursor.fetchone()[0]
+        
+        if count > 0:
+            print(f"✅ Department admins already exist ({count} admins)")
+            return
+        
+        # Create default department admins
+        dept_admins = [
+            {
+                "name": "Water Admin",
+                "username": "water_admin",
+                "password": generate_password_hash("water123"),
+                "department": "Water Crisis"
+            },
+            {
+                "name": "Road Admin",
+                "username": "road_admin",
+                "password": generate_password_hash("road123"),
+                "department": "Road Maintenance(Engg)"
+            },
+            {
+                "name": "Garbage Admin",
+                "username": "garbage_admin",
+                "password": generate_password_hash("garbage123"),
+                "department": "Solid Waste (Garbage) Related"
+            },
+            {
+                "name": "Electrical Admin",
+                "username": "electrical_admin",
+                "password": generate_password_hash("electrical123"),
+                "department": "Electrical"
+            },
+            {
+                "name": "General Admin",
+                "username": "general_admin",
+                "password": generate_password_hash("general123"),
+                "department": "General Department"
+            }
+        ]
+        
+        for admin in dept_admins:
+            cursor.execute(
+                "INSERT INTO dept_admins (name, username, password, department) VALUES (?, ?, ?, ?)",
+                (admin["name"], admin["username"], admin["password"], admin["department"])
+            )
+        
+        conn.commit()
+        print(f"✅ Created {len(dept_admins)} department admin accounts")
+
 # Initialize database on import
 init_db()
+create_default_dept_admins()
 
 class SQLiteDB:
     """SQLite Database wrapper to mimic MongoDB interface"""
