@@ -119,45 +119,49 @@ def create_default_dept_admins():
         # Create default department admins
         dept_admins = [
             {
-                "name": "Water Admin",
+                "name": "Water Department Admin",
                 "username": "water_admin",
                 "password": generate_password_hash("water123"),
                 "department": "Water Crisis"
             },
             {
-                "name": "Road Admin",
+                "name": "Road Department Admin",
                 "username": "road_admin",
                 "password": generate_password_hash("road123"),
                 "department": "Road Maintenance(Engg)"
             },
             {
-                "name": "Garbage Admin",
+                "name": "Garbage Department Admin",
                 "username": "garbage_admin",
                 "password": generate_password_hash("garbage123"),
                 "department": "Solid Waste (Garbage) Related"
             },
             {
-                "name": "Electrical Admin",
+                "name": "Electrical Department Admin",
                 "username": "electrical_admin",
                 "password": generate_password_hash("electrical123"),
                 "department": "Electrical"
             },
             {
-                "name": "General Admin",
+                "name": "General Department Admin",
                 "username": "general_admin",
                 "password": generate_password_hash("general123"),
                 "department": "General Department"
             }
         ]
         
-        for admin in dept_admins:
-            cursor.execute(
-                "INSERT INTO dept_admins (name, username, password, department) VALUES (?, ?, ?, ?)",
-                (admin["name"], admin["username"], admin["password"], admin["department"])
-            )
-        
-        conn.commit()
-        print(f"✅ Created {len(dept_admins)} department admin accounts")
+        try:
+            for admin in dept_admins:
+                cursor.execute(
+                    "INSERT INTO dept_admins (name, username, password, department) VALUES (?, ?, ?, ?)",
+                    (admin["name"], admin["username"], admin["password"], admin["department"])
+                )
+            
+            conn.commit()
+            print(f"✅ Created {len(dept_admins)} department admin accounts")
+        except Exception as e:
+            print(f"❌ Error creating department admins: {e}")
+            conn.rollback()
 
 # Initialize database on import
 init_db()

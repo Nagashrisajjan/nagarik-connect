@@ -50,7 +50,7 @@ def get_workers():
 
 
 # ---- LANDING PAGE ----
-# ---- DEBUG ROUTE (Remove in production) ----
+# ---- DEBUG ROUTES (Remove in production) ----
 @app.route("/debug/admins")
 def debug_admins():
     """Debug endpoint to check department admins"""
@@ -72,6 +72,16 @@ def debug_admins():
         })
     
     return result
+
+@app.route("/setup/create-admins")
+def setup_create_admins():
+    """Manually create department admins"""
+    from database_sqlite import create_default_dept_admins
+    try:
+        create_default_dept_admins()
+        return {"status": "success", "message": "Department admins created/checked"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 @app.route("/", endpoint="home")
 def landing():
@@ -752,20 +762,33 @@ def dept_admin_login():
     admin = None
     try:
         db = get_db()
+        
+        # Debug: Check total admins
+        all_admins = db.dept_admins.find()
+        print(f"DEBUG: Total dept admins in DB: {len(all_admins)}")
+        
         admin = db.dept_admins.find_one({"username": username})
+        print(f"DEBUG: Looking for username '{username}', found: {admin is not None}")
         
         if admin is None:
-            flash("Invalid credentials", "danger")
+            print(f"DEBUG: Admin not found for username: {username}")
+            flash("Invalid credentials - user not found", "danger")
             return render_template("dept_admin_login.html")
+        
+        print(f"DEBUG: Admin found - {admin.get('username')} / {admin.get('department')}")
         
         # Safely get password field
         if "password" not in admin:
-            flash("Invalid credentials", "danger")
+            print("DEBUG: Password field missing in admin record")
+            flash("Invalid credentials - password error", "danger")
             return render_template("dept_admin_login.html")
         
         # Check password
-        if not check_password_hash(admin["password"], password):
-            flash("Invalid credentials", "danger")
+        password_valid = check_password_hash(admin["password"], password)
+        print(f"DEBUG: Password check result: {password_valid}")
+        
+        if not password_valid:
+            flash("Invalid credentials - wrong password", "danger")
             return render_template("dept_admin_login.html")
         
         # Login successful - SQLite uses 'id' field
