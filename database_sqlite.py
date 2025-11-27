@@ -165,7 +165,46 @@ def create_default_dept_admins():
 
 # Initialize database on import
 init_db()
+
+# Force check and fix department admins
+def fix_dept_admins():
+    """Ensure all 5 department admins exist with correct credentials"""
+    from werkzeug.security import generate_password_hash
+    
+    required_admins = {
+        "water_admin": ("Water Department Admin", "water123", "Water Crisis"),
+        "road_admin": ("Road Department Admin", "road123", "Road Maintenance(Engg)"),
+        "garbage_admin": ("Garbage Department Admin", "garbage123", "Solid Waste (Garbage) Related"),
+        "electrical_admin": ("Electrical Department Admin", "electrical123", "Electrical"),
+        "general_admin": ("General Department Admin", "general123", "General Department")
+    }
+    
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        
+        for username, (name, password, department) in required_admins.items():
+            # Check if admin exists
+            cursor.execute("SELECT id FROM dept_admins WHERE username = ?", (username,))
+            existing = cursor.fetchone()
+            
+            if not existing:
+                # Create missing admin
+                hashed_pw = generate_password_hash(password)
+                cursor.execute(
+                    "INSERT INTO dept_admins (name, username, password, department) VALUES (?, ?, ?, ?)",
+                    (name, username, hashed_pw, department)
+                )
+                print(f"✅ Created missing admin: {username}")
+        
+        conn.commit()
+        
+        # Verify count
+        cursor.execute("SELECT COUNT(*) FROM dept_admins")
+        total = cursor.fetchone()[0]
+        print(f"✅ Department admins verified: {total} total")
+
 create_default_dept_admins()
+fix_dept_admins()
 
 class SQLiteDB:
     """SQLite Database wrapper to mimic MongoDB interface"""
