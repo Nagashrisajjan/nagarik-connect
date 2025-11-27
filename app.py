@@ -37,20 +37,19 @@ def allowed_file(filename):
     return True
 # ---- DATABASE CONNECTION ----
 def get_db_connection():
+    # Use environment variables for production, fallback to local for development
     return mysql.connector.connect(
-        host="localhost",
-        user="root",
-        password="",
-        database="updatedicgs"
+        host=os.environ.get('MYSQL_HOST', 'localhost'),
+        user=os.environ.get('MYSQL_USER', 'root'),
+        password=os.environ.get('MYSQL_PASSWORD', ''),
+        database=os.environ.get('MYSQL_DATABASE', 'updatedicgs')
     )
 
 def get_workers():
     conn = get_db_connection()
     cursor = conn.cursor(dictionary=True)
-
     cursor.execute("SELECT * FROM workers")
     workers = cursor.fetchall()
-
     cursor.close()
     conn.close()
     return workers
