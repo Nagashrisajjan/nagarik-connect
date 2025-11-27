@@ -1,4 +1,4 @@
-from database import get_db
+from database_sqlite import get_db
 from bson import ObjectId
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -13,7 +13,7 @@ from translations import translations
 
 # ---- APP CONFIG ----
 app = Flask(__name__)
-app.secret_key = "super_secret_key"
+app.secret_key = os.environ.get('SECRET_KEY', 'super_secret_key_change_in_production')
 app.config['BABEL_DEFAULT_LOCALE'] = 'en'
 app.config['LANGUAGES'] = ['en', 'kn', 'hi', 'te', 'ta']
 
@@ -42,9 +42,7 @@ def allowed_file(filename):
 def get_workers():
     db = get_db()
     workers = list(db.workers.find())
-    for w in workers:
-        w["id"] = str(w["_id"])
-    return workers
+    # SQLite already has 'id' field
     return workers
 
 
@@ -98,11 +96,10 @@ def login():
 
         db = get_db()
         user = db.users.find_one({"email": email})
-        if user:
-            user["id"] = str(user["_id"])
 
         if user and check_password_hash(user["password"], password):
-            session["user_id"] = user["id"]
+            # SQLite already has 'id' field, no need to convert from _id
+            session["user_id"] = str(user["id"])
             session["name"] = user["name"]
             session["email"] = user["email"]
             session["role"] = user["role"]
@@ -252,74 +249,78 @@ def admin_dashboard():
 
     db = get_db()
 
-    # Fetch all complaints with user and worker info using MongoDB aggregation
-    complaints = list(db.complaints.aggregate([
-        {"$lookup": {
-            "from": "users",
-            "let": {"user_id_str": "$user_id"},
-            "pipeline": [
-                {"$addFields": {"id_str": {"$toString": "$_id"}}},
-                {"$match": {"$expr": {"$eq": ["$id_str", "$$user_id_str"]}}}
-            ],
-            "as": "user_info"
-        }},
-        {"$lookup": {
-            "from": "workers",
-            "let": {"worker_id": "$assigned_worker_id"},
-            "pipeline": [
-                {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$worker_id"]}}}
-            ],
-            "as": "worker_info"
-        }},
-        {"$unwind": {"path": "$user_info", "preserveNullAndEmptyArrays": True}},
-        {"$unwind": {"path": "$worker_info", "preserveNullAndEmptyArrays": True}},
-        {"$addFields": {
-            "id": {"$toString": "$_id"},
-            "user_name": "$user_info.name",
-            "assigned_worker_name": "$worker_info.name",
-            "assigned_worker_phone": "$worker_info.phone",
-            "worker_department": "$worker_info.department"
-        }},
-        {"$sort": {"created_at": -1}}
-    ]))
+    # Fetch all complaints (simplified for SQLite)
+    complaints = list(db.complaints.find())
+    
+    # Manually join with users and workers
+    for complaint in complaints:
+        # Get user info
+        if complaint.get("user_id"):
+            try:
+                user_id = int(complaint["user_id"]) if str(complaint["user_id"]).isdigit() else None
+                if user_id:
+                    user = db.users.find_one({"id": user_id})
+                    if user:
+                        complaint["user_name"] = user.get("name")
+            except (ValueError, TypeError, AttributeError):
+                pass
+        
+        # Get worker info
+        if complaint.get("assigned_worker_id"):
+            try:
+                worker_id = int(complaint["assigned_worker_id"])
+                worker = db.workers.find_one({"id": worker_id})
+                if worker:
+                    complaint["assigned_worker_name"] = worker.get("name")
+                    complaint["assigned_worker_phone"] = worker.get("phone")
+                    complaint["worker_department"] = worker.get("department")
+            except (ValueError, TypeError):
+                pass
+    
+    # Sort by created_at (newest first)
+    complaints.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
     # Fetch all workers
-    all_workers = list(db.workers.find().sort([("department", 1), ("name", 1)]))
-    for w in all_workers:
-        w["id"] = str(w["_id"])
+    all_workers = list(db.workers.find())
 
-    # ✅ Complaint statistics
+    # Complaint statistics
     total = db.complaints.count_documents({})
-
     pending = db.complaints.count_documents({"status": "Pending"})
-
     in_progress = db.complaints.count_documents({"status": "In Progress"})
-
     resolved = db.complaints.count_documents({"status": "Resolved"})
 
-    # Fetch department-wise complaint counts using MongoDB aggregation
-    dept_data = list(db.complaints.aggregate([
-        {"$group": {"_id": "$department", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}}
-    ]))
+    # Department-wise complaint counts (manual grouping for SQLite)
+    all_complaints_for_dept = list(db.complaints.find())
+    dept_counts_dict = {}
+    for c in all_complaints_for_dept:
+        dept = c.get("department", "Unknown")
+        dept_counts_dict[dept] = dept_counts_dict.get(dept, 0) + 1
     
-    dept_labels = [d["_id"] for d in dept_data]
-    dept_counts = [d["count"] for d in dept_data]
+    # Sort by count
+    dept_items = sorted(dept_counts_dict.items(), key=lambda x: x[1], reverse=True)
+    dept_labels = [item[0] for item in dept_items]
+    dept_counts = [item[1] for item in dept_items]
 
-    # ✅ Format timestamps
+    # Format timestamps
     for c in complaints:
-        if isinstance(c.get("created_at"), datetime):
-            c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
+        if c.get("created_at"):
+            try:
+                if isinstance(c["created_at"], str):
+                    c["created_at"] = datetime.fromisoformat(c["created_at"]).strftime("%Y-%m-%d %H:%M")
+                elif isinstance(c["created_at"], datetime):
+                    c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
+            except:
+                pass
 
     return render_template(
         "admin_dashboard.html",
         name=session["name"],
         complaints=complaints,
         all_workers=all_workers,     # ✅ Pass worker list to template
-        total_all=total_all,
-        pending_all=pending_all,
-        in_progress_all=in_progress_all,
-        resolved_all=resolved_all,
+        total_all=total,
+        pending_all=pending,
+        in_progress_all=in_progress,
+        resolved_all=resolved,
         dept_labels=dept_labels,     # ✅ Department names for chart
         dept_counts=dept_counts      # ✅ Complaint counts per department
     )
@@ -470,7 +471,7 @@ def upload_admin_image(complaint_id):
 
     db = get_db()
     db.complaints.update_one(
-        {"_id": ObjectId(complaint_id)},
+        {"id": complaint_id},
         {"$set": {"admin_image": filename}}
     )
 
@@ -490,7 +491,7 @@ def update_status(complaint_id):
 
     db = get_db()
     db.complaints.update_one(
-        {"_id": ObjectId(complaint_id)},
+        {"id": complaint_id},
         {"$set": {"status": new_status}}
     )
 
@@ -524,7 +525,7 @@ def add_worker():
 
     # Assign this worker to the complaint
     db.complaints.update_one(
-        {"_id": ObjectId(complaint_id)},
+        {"id": int(complaint_id)},
         {"$set": {
             "assigned_worker_id": worker_id,
             "assigned_worker_name": name,
@@ -547,7 +548,7 @@ def assign_worker():
     db = get_db()
 
     # Fetch worker details
-    worker = db.workers.find_one({"_id": ObjectId(worker_id)})
+    worker = db.workers.find_one({"id": int(worker_id)})
     
     if not worker:
         flash("Invalid worker selected!", "danger")
@@ -555,7 +556,7 @@ def assign_worker():
 
     # Assign worker to complaint
     db.complaints.update_one(
-        {"_id": ObjectId(complaint_id)},
+        {"id": int(complaint_id)},
         {"$set": {
             "assigned_worker_id": worker_id,
             "assigned_worker_name": worker["name"],
@@ -630,9 +631,8 @@ def feedback():
     ]))
 
     # Fetch user's complaints for dropdown
-    complaints = list(db.complaints.find({"user_id": session["user_id"]}).sort("created_at", -1))
-    for c in complaints:
-        c["id"] = str(c["_id"])
+    complaints = list(db.complaints.find({"user_id": session["user_id"]}))
+    # SQLite already has 'id' field
 
     return render_template("feedback.html", feedbacks=feedbacks, complaints=complaints)
 
@@ -651,7 +651,7 @@ def admin_feedback():
         reply_msg = request.form["reply"].strip()
 
         db.feedback.update_one(
-            {"_id": ObjectId(feedback_id)},
+            {"id": int(feedback_id)},
             {"$set": {
                 "admin_reply": reply_msg,
                 "replied_at": datetime.now().isoformat()
@@ -715,31 +715,64 @@ def admin_feedback():
 # ---- DEPARTMENT ADMIN LOGIN ----
 @app.route("/dept_admin/login", methods=["GET", "POST"], endpoint="dept_admin_login")
 def dept_admin_login():
-    if request.method == "POST":
-        username = request.form.get("username")
-        password = request.form.get("password")
-
+    if request.method == "GET":
+        return render_template("dept_admin_login.html")
+    
+    # POST request
+    username = request.form.get("username", "")
+    password = request.form.get("password", "")
+    
+    if not username or not password:
+        flash("Please enter username and password", "danger")
+        return render_template("dept_admin_login.html")
+    
+    admin = None
+    try:
         db = get_db()
-        dept_admin = db.dept_admins.find_one({"username": username})
-        if dept_admin:
-            dept_admin["id"] = str(dept_admin["_id"])
+        admin = db.dept_admins.find_one({"username": username})
+        
+        if admin is None:
+            flash("Invalid credentials", "danger")
+            return render_template("dept_admin_login.html")
+        
+        # Safely get password field
+        if "password" not in admin:
+            flash("Invalid credentials", "danger")
+            return render_template("dept_admin_login.html")
+        
+        # Check password
+        if not check_password_hash(admin["password"], password):
+            flash("Invalid credentials", "danger")
+            return render_template("dept_admin_login.html")
+        
+        # Login successful - SQLite uses 'id' field
+        if "id" not in admin:
+            flash("Database error - missing ID", "danger")
+            return render_template("dept_admin_login.html")
+        
+        session["dept_admin_id"] = str(admin["id"])
+        session["dept_admin_name"] = admin["name"]
+        session["dept_admin_username"] = admin["username"]
+        session["department"] = admin["department"]
+        session["role"] = "dept_admin"
+        
+        flash(f"Welcome {admin['name']}!", "success")
+        return redirect(url_for("dept_admin_dashboard"))
+        
+    except KeyError as ke:
+        print(f"KeyError in dept_admin_login: {ke}")
+        print(f"Admin object keys: {list(admin.keys()) if admin else 'None'}")
+        import traceback
+        traceback.print_exc()
+        flash("Login error - missing required field", "danger")
+        return render_template("dept_admin_login.html")
+    except Exception as e:
+        print(f"Exception in dept_admin_login: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        flash("Login error occurred", "danger")
+        return render_template("dept_admin_login.html")
 
-        if dept_admin and check_password_hash(dept_admin["password"], password):
-            session["dept_admin_id"] = dept_admin["id"]
-            session["dept_admin_name"] = dept_admin["name"]
-            session["dept_admin_username"] = dept_admin["username"]
-            session["department"] = dept_admin["department"]
-            session["role"] = "dept_admin"
-            flash(f"Welcome {dept_admin['name']}!", "success")
-            return redirect(url_for("dept_admin_dashboard"))
-        else:
-            flash("Invalid username or password", "danger")
-            return redirect(url_for("dept_admin_login"))
-
-    return render_template("dept_admin_login.html")
-
-
-# ---- DEPARTMENT ADMIN DASHBOARD ----
 @app.route("/dept_admin/dashboard", endpoint="dept_admin_dashboard")
 def dept_admin_dashboard():
     if "dept_admin_id" not in session or session.get("role") != "dept_admin":
@@ -751,36 +784,35 @@ def dept_admin_dashboard():
 
     db = get_db()
 
-    # Fetch complaints for this department with user and worker info
-    complaints = list(db.complaints.aggregate([
-        {"$match": {"department": department}},
-        {"$lookup": {
-            "from": "users",
-            "let": {"user_id_str": "$user_id"},
-            "pipeline": [
-                {"$addFields": {"id_str": {"$toString": "$_id"}}},
-                {"$match": {"$expr": {"$eq": ["$id_str", "$$user_id_str"]}}}
-            ],
-            "as": "user_info"
-        }},
-        {"$lookup": {
-            "from": "workers",
-            "let": {"worker_id": "$assigned_worker_id"},
-            "pipeline": [
-                {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$worker_id"]}}}
-            ],
-            "as": "worker_info"
-        }},
-        {"$unwind": {"path": "$user_info", "preserveNullAndEmptyArrays": True}},
-        {"$unwind": {"path": "$worker_info", "preserveNullAndEmptyArrays": True}},
-        {"$addFields": {
-            "id": {"$toString": "$_id"},
-            "user_name": "$user_info.name",
-            "assigned_worker_name": "$worker_info.name",
-            "assigned_worker_phone": "$worker_info.phone"
-        }},
-        {"$sort": {"created_at": -1}}
-    ]))
+    # Fetch complaints for this department (simplified for SQLite)
+    complaints = list(db.complaints.find({"department": department}))
+    
+    # Manually add user and worker info
+    for complaint in complaints:
+        # Add user info
+        if complaint.get("user_id"):
+            try:
+                user_id = int(complaint["user_id"]) if str(complaint["user_id"]).isdigit() else None
+                if user_id:
+                    user = db.users.find_one({"id": user_id})
+                    if user:
+                        complaint["user_name"] = user.get("name")
+            except (ValueError, TypeError):
+                pass
+        
+        # Add worker info
+        if complaint.get("assigned_worker_id"):
+            try:
+                worker_id = int(complaint["assigned_worker_id"])
+                worker = db.workers.find_one({"id": worker_id})
+                if worker:
+                    complaint["assigned_worker_name"] = worker.get("name")
+                    complaint["assigned_worker_phone"] = worker.get("phone")
+            except (ValueError, TypeError):
+                pass
+    
+    # Sort by created_at
+    complaints.sort(key=lambda x: x.get("created_at", ""), reverse=True)
 
     # Statistics
     total = db.complaints.count_documents({"department": department})
@@ -788,43 +820,43 @@ def dept_admin_dashboard():
     in_progress = db.complaints.count_documents({"department": department, "status": "In Progress"})
     resolved = db.complaints.count_documents({"department": department, "status": "Resolved"})
 
-    # Fetch workers for this department with complaint counts
-    workers = list(db.workers.aggregate([
-        {"$match": {"department": department}},
-        {"$lookup": {
-            "from": "complaints",
-            "let": {"worker_id_str": {"$toString": "$_id"}},
-            "pipeline": [
-                {"$match": {"$expr": {"$eq": ["$assigned_worker_id", "$$worker_id_str"]}}}
-            ],
-            "as": "complaints"
-        }},
-        {"$addFields": {
-            "id": {"$toString": "$_id"},
-            "complaint_count": {"$size": "$complaints"}
-        }},
-        {"$project": {"complaints": 0}},
-        {"$sort": {"name": 1}}
-    ]))
-
-    # Monthly trend data (simplified - last 6 months)
-    trend_data_raw = list(db.complaints.aggregate([
-        {"$match": {"department": department}},
-        {"$group": {
-            "_id": {"$substr": ["$created_at", 0, 7]},
-            "count": {"$sum": 1}
-        }},
-        {"$sort": {"_id": 1}},
-        {"$limit": 6}
-    ]))
+    # Fetch workers for this department (simplified for SQLite)
+    workers = list(db.workers.find({"department": department}))
     
-    trend_labels = [d["_id"] for d in trend_data_raw]
-    trend_data = [d["count"] for d in trend_data_raw]
+    # Add complaint counts manually
+    for worker in workers:
+        worker_complaints = db.complaints.count_documents({
+            "assigned_worker_id": str(worker["id"])
+        })
+        worker["complaint_count"] = worker_complaints
+    
+    # Sort by name
+    workers.sort(key=lambda x: x.get("name", ""))
+
+    # Monthly trend data (simplified for SQLite)
+    dept_complaints = list(db.complaints.find({"department": department}))
+    trend_dict = {}
+    for c in dept_complaints:
+        if c.get("created_at"):
+            month = str(c["created_at"])[:7] if isinstance(c["created_at"], str) else ""
+            if month:
+                trend_dict[month] = trend_dict.get(month, 0) + 1
+    
+    # Sort and limit to last 6 months
+    trend_items = sorted(trend_dict.items())[-6:] if trend_dict else []
+    trend_labels = [item[0] for item in trend_items]
+    trend_data = [item[1] for item in trend_items]
 
     # Format timestamps
     for c in complaints:
-        if isinstance(c.get("created_at"), datetime):
-            c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
+        if c.get("created_at"):
+            try:
+                if isinstance(c["created_at"], str):
+                    c["created_at"] = datetime.fromisoformat(c["created_at"]).strftime("%Y-%m-%d %H:%M")
+                elif isinstance(c["created_at"], datetime):
+                    c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
+            except:
+                pass
 
     return render_template(
         "dept_admin_dashboard.html",
@@ -841,7 +873,6 @@ def dept_admin_dashboard():
     )
 
 
-# ---- DEPARTMENT ADMIN: UPDATE STATUS ----
 @app.route("/dept_admin/update_status/<int:complaint_id>", methods=["POST"], endpoint="dept_update_status")
 def dept_update_status(complaint_id):
     if "dept_admin_id" not in session or session.get("role") != "dept_admin":
@@ -858,12 +889,12 @@ def dept_update_status(complaint_id):
     
     if remarks:
         db.complaints.update_one(
-            {"_id": ObjectId(complaint_id)},
-            {"$set": {"status": status, "remarks": remarks}}
+            {"id": complaint_id},
+            {"$set": {"status": new_status, "remarks": remarks}}
         )
     else:
         db.complaints.update_one(
-            {"_id": ObjectId(complaint_id)},
+            {"id": complaint_id},
             {"$set": {"status": new_status}}
         )
 
@@ -890,7 +921,7 @@ def dept_upload_admin_image(complaint_id):
 
     db = get_db()
     db.complaints.update_one(
-        {"_id": ObjectId(complaint_id)},
+        {"id": complaint_id},
         {"$set": {"admin_image": filename}}
     )
 
@@ -922,7 +953,7 @@ def dept_add_worker():
 
     # Assign worker to complaint
     db.complaints.update_one(
-        {"_id": ObjectId(complaint_id)},
+        {"id": int(complaint_id)},
         {"$set": {
             "assigned_worker_id": worker_id,
             "assigned_worker_name": name,
@@ -950,7 +981,7 @@ def dept_admin_feedback():
         reply_msg = request.form["reply"].strip()
 
         db.feedback.update_one(
-            {"_id": ObjectId(feedback_id)},
+            {"id": int(feedback_id)},
             {"$set": {
                 "admin_reply": reply_msg,
                 "replied_at": datetime.now().isoformat()
@@ -991,7 +1022,34 @@ def dept_admin_feedback():
     return render_template("admin_feedback.html", feedbacks=feedbacks, analytics=None)
 
 
+# ---- API ENDPOINT FOR STATS (for frontend) ----
+@app.route("/api/stats", methods=["GET"])
+def api_stats():
+    """API endpoint to provide complaint statistics"""
+    try:
+        db = get_db()
+        
+        total = db.complaints.count_documents({})
+        resolved = db.complaints.count_documents({"status": {"$regex": "resolved", "$options": "i"}})
+        pending = db.complaints.count_documents({"status": {"$regex": "pending", "$options": "i"}})
+        in_progress = db.complaints.count_documents({"status": {"$regex": "in progress", "$options": "i"}})
+        
+        return {
+            "total": total,
+            "resolved": resolved,
+            "pending": pending,
+            "in_progress": in_progress
+        }
+    except Exception as e:
+        return {
+            "total": 0,
+            "resolved": 0,
+            "pending": 0,
+            "in_progress": 0,
+            "error": str(e)
+        }, 500
+
 # ---- RUN APP ----
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=True)

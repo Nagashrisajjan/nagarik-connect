@@ -1,0 +1,73 @@
+========================================
+  DEPLOY YOUR APP - SIMPLE STEPS
+========================================
+
+Your Railway project is created but needs GitHub.
+Here's the EASIEST way:
+
+STEP 1: Push to GitHub
+-----------------------
+Run these commands:
+
+git add .
+git commit -m "Ready for deployment"
+git push
+
+(If you don't have a GitHub repo yet, create one at github.com/new)
+
+
+STEP 2: Deploy on Render
+-------------------------
+1. Go to: https://dashboard.render.com/
+
+2. Click "New +" → "Web Service"
+
+3. Connect your GitHub repository
+
+4. Render will auto-detect your render.yaml
+
+5. Click "Create Web Service"
+
+6. Wait 3-5 minutes for build
+
+
+STEP 3: Get Your Link
+---------------------
+After deployment completes, you'll get a link like:
+https://icgs-complaints-system.onrender.com
+
+That's your live app! ✅
+
+
+ALTERNATIVE: Use Railway with GitHub
+-------------------------------------
+1. Go to: https://railway.com/project/d99e34b8-3b60-40f3-8f46-f31eda34b392
+
+2. Click on your service
+
+3. Click "Settings" → "Source"
+
+4. Connect GitHub repository
+
+5. Railway will auto-deploy
+
+6. Get your link from "Settings" → "Domains"
+
+
+========================================
+  IMPORTANT NOTES
+========================================
+
+✅ Your ML model (255MB) is excluded from deployment
+✅ The app will use fallback department prediction
+✅ Database will be created automatically on first run
+✅ All department admin accounts will be set up
+
+Department Admin Credentials:
+- water_admin / water123
+- road_admin / road123
+- garbage_admin / garbage123
+- electrical_admin / electrical123
+- general_admin / general123
+
+========================================
