@@ -1,5 +1,6 @@
+from database import get_db
+from bson import ObjectId
 from flask import Flask, render_template, request, redirect, url_for, session, flash
-import mysql.connector
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime
@@ -36,22 +37,17 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 def allowed_file(filename):
     return True
 # ---- DATABASE CONNECTION ----
-def get_db_connection():
-    # Use environment variables for production, fallback to local for development
-    return mysql.connector.connect(
-        host=os.environ.get('MYSQL_HOST', 'localhost'),
+# Database connection handled by database.py,
         user=os.environ.get('MYSQL_USER', 'root'),
         password=os.environ.get('MYSQL_PASSWORD', ''),
         database=os.environ.get('MYSQL_DATABASE', 'updatedicgs')
     )
 
 def get_workers():
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute("SELECT * FROM workers")
-    workers = cursor.fetchall()
-    cursor.close()
-    conn.close()
+    db = get_db()
+    workers = list(db.workers.find())
+        for w in workers:
+            w["id"] = str(w["_id"])
     return workers
 
 
@@ -65,23 +61,15 @@ def landing():
     if 'lang' not in session:
         session['lang'] = 'en'
     
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
-    cursor.execute("SELECT COUNT(*) AS total FROM complaints")
-    total_complaints = cursor.fetchone()["total"]
+    total_complaints = db.complaints.count_documents({})
 
-    cursor.execute("SELECT COUNT(*) AS solved FROM complaints WHERE LOWER(status)='resolved'")
-    solved_complaints = cursor.fetchone()["solved"]
+    solved_complaints = db.complaints.count_documents({"status": {"$regex": "resolved", "$options": "i"}})
 
-    cursor.execute("SELECT COUNT(*) AS pending FROM complaints WHERE LOWER(status)='pending'")
-    pending_complaints = cursor.fetchone()["pending"]
+    pending_complaints = db.complaints.count_documents({"status": {"$regex": "pending", "$options": "i"}})
 
-    cursor.execute("SELECT COUNT(*) AS in_progress FROM complaints WHERE LOWER(status) LIKE '%in progress%'")
-    in_progress_complaints = cursor.fetchone()["in_progress"]
-
-    cursor.close()
-    conn.close()
+    in_progress_complaints = db.complaints.count_documents({"status": {"$regex": "in progress", "$options": "i"}})
 
     current_lang = session.get('lang', 'en')
     print(f"Current language in home route: {current_lang}")  # Debug print
@@ -111,12 +99,10 @@ def login():
         email = request.form["email"].strip()
         password = request.form["password"]
 
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM users WHERE email=%s", (email,))
-        user = cursor.fetchone()
-        cursor.close()
-        conn.close()
+        db = get_db()
+        user = db.users.find_one({"email": email})
+        if user:
+            user["id"] = str(user["_id"])
 
         if user and check_password_hash(user["password"], password):
             session["user_id"] = user["id"]
@@ -160,20 +146,24 @@ def register():
         hashed_password = generate_password_hash(raw_password)
 
         try:
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO users (name, email, password, role) VALUES (%s, %s, %s, %s)",
-                (name, email, hashed_password, role)
-            )
-            conn.commit()
-            cursor.close()
-            conn.close()
+            db = get_db()
+            # Check if email already exists
+            if db.users.find_one({"email": email}):
+                flash("Email already exists! Please use a different email.", "error")
+                return render_template("register.html")
+            
+            db.users.insert_one({
+                "name": name,
+                "email": email,
+                "password": hashed_password,
+                "role": role,
+                "created_at": datetime.now().isoformat()
+            })
 
             flash("Registered successfully! Please login.", "success")
             return redirect(url_for("login"))
-        except mysql.connector.IntegrityError:
-            flash("Email already exists! Please use a different email.", "error")
+        except Exception as e:
+            flash(f"Registration error: {str(e)}", "error")
             return render_template("register.html")
 
     return render_template("register.html")
@@ -184,75 +174,49 @@ def user_dashboard():
     if "user_id" not in session or session.get("role") != "citizen":
         return redirect(url_for("login"))
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
+    user_id = session["user_id"]
 
-    # ✅ Fetch complaints + assigned worker info
-    cursor.execute("""
-    SELECT 
-        c.id,
-        c.user_id,
-        c.title,
-        c.description,
-        c.department,
-        c.status,
-        c.remarks,
-        c.latitude,
-        c.longitude,
-        c.location,
-        c.image,
-        c.created_at,
+    # MongoDB aggregation to join complaints with workers and users
+    complaints = list(db.complaints.aggregate([
+        {"$match": {"user_id": user_id}},
+        {"$lookup": {
+            "from": "workers",
+            "let": {"worker_id": "$assigned_worker_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": ["$_id", {"$toObjectId": "$$worker_id"}]}}}
+            ],
+            "as": "worker_info"
+        }},
+        {"$unwind": {
+            "path": "$worker_info",
+            "preserveNullAndEmptyArrays": True
+        }},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "assigned_worker_name": {"$ifNull": ["$worker_info.name", None]},
+            "assigned_worker_phone": {"$ifNull": ["$worker_info.phone", None]},
+            "user_name": session.get("name")
+        }},
+        {"$sort": {"created_at": -1}}
+    ]))
 
-        -- ✅ Worker details (from workers table)
-        w.name AS assigned_worker_name,
-        w.phone AS assigned_worker_phone,
-        w.department AS worker_department,
-
-        -- ✅ User info
-        u.name AS user_name
-
-    FROM complaints c
-    JOIN users u ON c.user_id = u.id
-    LEFT JOIN workers w ON c.assigned_worker_id = w.id   -- ✅ Correct worker join
-
-    WHERE c.user_id = %s
-    ORDER BY c.created_at DESC
-""", (session["user_id"],))
-
-    complaints = cursor.fetchall()
-
-    # ✅ Format timestamps
+    # Format timestamps
     for c in complaints:
-        if isinstance(c.get("created_at"), datetime):
-            c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
+        if c.get("created_at"):
+            try:
+                if isinstance(c["created_at"], str):
+                    c["created_at"] = datetime.fromisoformat(c["created_at"]).strftime("%Y-%m-%d %H:%M")
+                elif isinstance(c["created_at"], datetime):
+                    c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
+            except:
+                pass
 
-    # ✅ Count totals
-    cursor.execute(
-        "SELECT COUNT(*) as total FROM complaints WHERE user_id=%s",
-        (session["user_id"],)
-    )
-    total = cursor.fetchone()["total"]
-
-    cursor.execute(
-        "SELECT COUNT(*) as resolved FROM complaints WHERE user_id=%s AND status='Resolved'",
-        (session["user_id"],)
-    )
-    resolved = cursor.fetchone()["resolved"]
-
-    cursor.execute(
-        "SELECT COUNT(*) as pending FROM complaints WHERE user_id=%s AND status='Pending'",
-        (session["user_id"],)
-    )
-    pending = cursor.fetchone()["pending"]
-
-    cursor.execute(
-        "SELECT COUNT(*) as in_progress FROM complaints WHERE user_id=%s AND LOWER(status) LIKE '%in progress%'",
-        (session["user_id"],)
-    )
-    in_progress = cursor.fetchone()["in_progress"]
-
-    cursor.close()
-    conn.close()
+    # Count totals
+    total = db.complaints.count_documents({"user_id": user_id})
+    resolved = db.complaints.count_documents({"user_id": user_id, "status": "Resolved"})
+    pending = db.complaints.count_documents({"user_id": user_id, "status": "Pending"})
+    in_progress = db.complaints.count_documents({"user_id": user_id, "status": {"$regex": "in progress", "$options": "i"}})
 
     return render_template(
         "user_dashboard.html",
@@ -289,65 +253,66 @@ def admin_dashboard():
     if "user_id" not in session or session.get("role") != "admin":
         return redirect(url_for("login"))
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
-    # ✅ Fetch complaints with user name
-    cursor.execute("""
-    SELECT 
-        c.*, 
-        u.name AS user_name,
-        w.name AS assigned_worker_name,
-        w.phone AS assigned_worker_phone,
-        w.department AS worker_department
-    FROM complaints c
-    JOIN users u ON c.user_id = u.id
-    LEFT JOIN workers w ON c.assigned_worker_id = w.id
-    ORDER BY c.created_at DESC
-""")
+    # Fetch all complaints with user and worker info using MongoDB aggregation
+    complaints = list(db.complaints.aggregate([
+        {"$lookup": {
+            "from": "users",
+            "let": {"user_id_str": "$user_id"},
+            "pipeline": [
+                {"$addFields": {"id_str": {"$toString": "$_id"}}},
+                {"$match": {"$expr": {"$eq": ["$id_str", "$$user_id_str"]}}}
+            ],
+            "as": "user_info"
+        }},
+        {"$lookup": {
+            "from": "workers",
+            "let": {"worker_id": "$assigned_worker_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$worker_id"]}}}
+            ],
+            "as": "worker_info"
+        }},
+        {"$unwind": {"path": "$user_info", "preserveNullAndEmptyArrays": True}},
+        {"$unwind": {"path": "$worker_info", "preserveNullAndEmptyArrays": True}},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "user_name": "$user_info.name",
+            "assigned_worker_name": "$worker_info.name",
+            "assigned_worker_phone": "$worker_info.phone",
+            "worker_department": "$worker_info.department"
+        }},
+        {"$sort": {"created_at": -1}}
+    ]))
 
-    complaints = cursor.fetchall()
-
-    # ✅ Fetch workers (same as workers = get_workers())
-    cursor.execute("""
-        SELECT id, name, phone, department 
-        FROM workers 
-        ORDER BY department, name
-    """)
-    all_workers = cursor.fetchall()
+    # Fetch all workers
+    all_workers = list(db.workers.find().sort([("department", 1), ("name", 1)]))
+    for w in all_workers:
+        w["id"] = str(w["_id"])
 
     # ✅ Complaint statistics
-    cursor.execute("SELECT COUNT(*) AS total FROM complaints")
-    total_all = cursor.fetchone()["total"]
+    total = db.complaints.count_documents({})
 
-    cursor.execute("SELECT COUNT(*) AS pending FROM complaints WHERE status='Pending'")
-    pending_all = cursor.fetchone()["pending"]
+    pending = db.complaints.count_documents({"status": "Pending"})
 
-    cursor.execute("SELECT COUNT(*) AS in_progress FROM complaints WHERE status='In Progress'")
-    in_progress_all = cursor.fetchone()["in_progress"]
+    in_progress = db.complaints.count_documents({"status": "In Progress"})
 
-    cursor.execute("SELECT COUNT(*) AS resolved FROM complaints WHERE status='Resolved'")
-    resolved_all = cursor.fetchone()["resolved"]
+    resolved = db.complaints.count_documents({"status": "Resolved"})
 
-    # ✅ Fetch department-wise complaint counts for chart
-    cursor.execute("""
-        SELECT department, COUNT(*) AS count 
-        FROM complaints 
-        GROUP BY department 
-        ORDER BY count DESC
-    """)
-    dept_data = cursor.fetchall()
+    # Fetch department-wise complaint counts using MongoDB aggregation
+    dept_data = list(db.complaints.aggregate([
+        {"$group": {"_id": "$department", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]))
     
-    dept_labels = [row["department"] for row in dept_data]
-    dept_counts = [row["count"] for row in dept_data]
+    dept_labels = [d["_id"] for d in dept_data]
+    dept_counts = [d["count"] for d in dept_data]
 
     # ✅ Format timestamps
     for c in complaints:
         if isinstance(c.get("created_at"), datetime):
             c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
-
-    cursor.close()
-    conn.close()
 
     return render_template(
         "admin_dashboard.html",
@@ -387,33 +352,37 @@ def department_dashboard(dept_name):
     # Normalize URL-friendly names to DB names if needed
     dept_name = DEPARTMENT_MAP.get(dept_name.lower(), dept_name)
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
-    cursor.execute("""
-        SELECT c.*, u.name AS user_name
-        FROM complaints c
-        JOIN users u ON c.user_id = u.id
-        WHERE c.department = %s
-        ORDER BY c.created_at DESC
-    """, (dept_name,))
-    complaints = cursor.fetchall()
+    # Fetch complaints for this department with user info
+    complaints = list(db.complaints.aggregate([
+        {"$match": {"department": dept_name}},
+        {"$lookup": {
+            "from": "users",
+            "let": {"user_id_str": "$user_id"},
+            "pipeline": [
+                {"$addFields": {"id_str": {"$toString": "$_id"}}},
+                {"$match": {"$expr": {"$eq": ["$id_str", "$$user_id_str"]}}}
+            ],
+            "as": "user_info"
+        }},
+        {"$unwind": {"path": "$user_info", "preserveNullAndEmptyArrays": True}},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "user_name": "$user_info.name"
+        }},
+        {"$sort": {"created_at": -1}}
+    ]))
 
-    cursor.execute("SELECT COUNT(*) AS total FROM complaints WHERE department=%s", (dept_name,))
-    total = cursor.fetchone()["total"]
-    cursor.execute("SELECT COUNT(*) AS pending FROM complaints WHERE department=%s AND status='Pending'", (dept_name,))
-    pending = cursor.fetchone()["pending"]
-    cursor.execute("SELECT COUNT(*) AS in_progress FROM complaints WHERE department=%s AND status='In Progress'", (dept_name,))
-    in_progress = cursor.fetchone()["in_progress"]
-    cursor.execute("SELECT COUNT(*) AS resolved FROM complaints WHERE department=%s AND status='Resolved'", (dept_name,))
-    resolved = cursor.fetchone()["resolved"]
+    total = db.complaints.count_documents({"department": dept_name})
+    pending = db.complaints.count_documents({"department": dept_name, "status": "Pending"})
+    in_progress = db.complaints.count_documents({"department": dept_name, "status": "In Progress"})
+    resolved = db.complaints.count_documents({"department": dept_name, "status": "Resolved"})
 
     for c in complaints:
         if isinstance(c.get("created_at"), datetime):
             c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
-        # ✅ DO NOT override assigned_worker_* here — they already come from DB
-
-    cursor.close(); conn.close()
+        # ✅ DO NOT override assigned_worker_* here — they already come from DB;
 
     return render_template(
         "department_dashboard.html",
@@ -458,33 +427,26 @@ def submit_complaint():
         os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
         image_file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
-    # ✅ Insert complaint with GPS (if available)
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        INSERT INTO complaints
-        (user_id, title, description, department, status, created_at,
-         image, location, latitude, longitude,
-         assigned_worker_id, assigned_worker_name, assigned_worker_phone)
-        VALUES (%s, %s, %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s)
-    """, (
-        session["user_id"],
-        title,
-        description,
-        department,
-        "Pending",
-        datetime.now(),
-        filename,
-        location_text,     # ✅ manual location text (optional)
-        latitude,          # ✅ GPS latitude (if available)
-        longitude,         # ✅ GPS longitude (if available)
-        None, None, None   # worker fields empty
-    ))
-    conn.commit()
-    cursor.close()
-    conn.close()
+    # Insert complaint into MongoDB
+    db = get_db()
+    db.complaints.insert_one({
+        "user_id": session["user_id"],
+        "user_name": session["name"],
+        "title": title,
+        "description": description,
+        "department": department,
+        "status": "Pending",
+        "created_at": datetime.now().isoformat(),
+        "image": filename,
+        "location": location_text,
+        "latitude": latitude,
+        "longitude": longitude,
+        "assigned_worker_id": None,
+        "assigned_worker_name": None,
+        "assigned_worker_phone": None,
+        "remarks": None,
+        "admin_image": None
+    })
 
     flash("✅ Complaint submitted successfully! The admin will assign a worker soon.", "success")
     return redirect(url_for("user_dashboard"))
@@ -509,15 +471,11 @@ def upload_admin_image(complaint_id):
     image_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     image_file.save(image_path)
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE complaints SET admin_image=%s WHERE id=%s",
-        (filename, complaint_id)
+    db = get_db()
+    db.complaints.update_one(
+        {"_id": ObjectId(complaint_id)},
+        {"$set": {"admin_image": filename}}
     )
-    conn.commit()
-    cursor.close()
-    conn.close()
 
     flash("✅ Admin image uploaded successfully!", "success")
     return redirect(url_for("admin_dashboard"))
@@ -533,15 +491,11 @@ def update_status(complaint_id):
         flash("Invalid status selected", "danger")
         return redirect(url_for("admin_dashboard"))
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE complaints SET status=%s WHERE id=%s",
-        (new_status, complaint_id)
+    db = get_db()
+    db.complaints.update_one(
+        {"_id": ObjectId(complaint_id)},
+        {"$set": {"status": new_status}}
     )
-    conn.commit()
-    cursor.close()
-    conn.close()
 
     flash(f"Complaint #{complaint_id} status updated to {new_status}", "success")
     return redirect(url_for("admin_dashboard"))
@@ -560,31 +514,26 @@ def add_worker():
     department = request.form['department']
     complaint_id = request.form['complaint_id']
 
-    # ✅ Create DB connection
-    db = get_db_connection()
-    cursor = db.cursor()
+    db = get_db()
+    
+    # Insert new worker
+    result = db.workers.insert_one({
+        "name": name,
+        "phone": phone,
+        "department": department,
+        "created_at": datetime.now().isoformat()
+    })
+    worker_id = str(result.inserted_id)
 
-    # ✅ Insert new worker
-    cursor.execute("""
-        INSERT INTO workers (name, phone, department)
-        VALUES (%s, %s, %s)
-    """, (name, phone, department))
-
-    worker_id = cursor.lastrowid  # get the ID of inserted worker
-
-    # ✅ Assign this worker to the complaint
-    cursor.execute("""
-        UPDATE complaints 
-        SET assigned_worker_id = %s
-        WHERE id = %s
-    """, (worker_id, complaint_id))
-
-    # ✅ Save changes
-    db.commit()
-
-    # ✅ Close DB resources
-    cursor.close()
-    db.close()
+    # Assign this worker to the complaint
+    db.complaints.update_one(
+        {"_id": ObjectId(complaint_id)},
+        {"$set": {
+            "assigned_worker_id": worker_id,
+            "assigned_worker_name": name,
+            "assigned_worker_phone": phone
+        }}
+    )
 
     flash("Worker assigned successfully!", "success")
     return redirect(url_for('admin_dashboard'))
@@ -598,37 +547,24 @@ def assign_worker():
     complaint_id = request.form["complaint_id"]
     worker_id = request.form["worker_id"]
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
-    # ✅ Fetch worker details
-    cursor.execute("SELECT * FROM workers WHERE id=%s", (worker_id,))
-    worker = cursor.fetchone()
-
+    # Fetch worker details
+    worker = db.workers.find_one({"_id": ObjectId(worker_id)})
+    
     if not worker:
         flash("Invalid worker selected!", "danger")
-        cursor.close()
-        conn.close()
         return redirect(url_for("admin_dashboard"))
 
-    # ✅ Assign worker to complaint
-    cursor.execute("""
-        UPDATE complaints
-        SET 
-            assigned_worker_id = %s,
-            assigned_worker_name = %s,
-            assigned_worker_phone = %s
-        WHERE id = %s
-    """, (
-        worker["id"],
-        worker["name"],
-        worker["phone"],
-        complaint_id
-    ))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    # Assign worker to complaint
+    db.complaints.update_one(
+        {"_id": ObjectId(complaint_id)},
+        {"$set": {
+            "assigned_worker_id": worker_id,
+            "assigned_worker_name": worker["name"],
+            "assigned_worker_phone": worker["phone"]
+        }}
+        )
 
     flash(f"Worker {worker['name']} assigned successfully!", "success")
     return redirect(url_for("admin_dashboard"))
@@ -648,8 +584,7 @@ def feedback():
     if "user_id" not in session or session.get("role") != "citizen":
         return redirect(url_for("login"))
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
     # Handle submission
     if request.method == "POST":
@@ -665,29 +600,42 @@ def feedback():
             os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
             image_file.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
-        cursor.execute("""
-            INSERT INTO feedback (user_id, title, message, image, rating, complaint_id, created_at)
-            VALUES (%s, %s, %s, %s, %s, %s, NOW())
-        """, (session["user_id"], title, message, filename, rating, complaint_id))
-        conn.commit()
+        db.feedback.insert_one({
+            "user_id": session["user_id"],
+            "title": title,
+            "message": message,
+            "image": filename,
+            "rating": rating,
+            "complaint_id": complaint_id,
+            "created_at": datetime.now().isoformat(),
+            "admin_reply": None,
+            "replied_at": None
+        })
         flash(_("feedback_submitted_successfully"), "success")
 
-    # Fetch user feedbacks
-    cursor.execute("""
-        SELECT f.*, c.title AS complaint_title
-        FROM feedback f
-        LEFT JOIN complaints c ON f.complaint_id = c.id
-        WHERE f.user_id=%s
-        ORDER BY f.created_at DESC
-    """, (session["user_id"],))
-    feedbacks = cursor.fetchall()
+    # Fetch user feedbacks with complaint titles
+    feedbacks = list(db.feedback.aggregate([
+        {"$match": {"user_id": session["user_id"]}},
+        {"$lookup": {
+            "from": "complaints",
+            "let": {"complaint_id": "$complaint_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$complaint_id"]}}}
+            ],
+            "as": "complaint_info"
+        }},
+        {"$unwind": {"path": "$complaint_info", "preserveNullAndEmptyArrays": True}},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "complaint_title": "$complaint_info.title"
+        }},
+        {"$sort": {"created_at": -1}}
+    ]))
 
-    # Fetch user's complaints for complaint-wise feedback
-    cursor.execute("SELECT id, title FROM complaints WHERE user_id=%s", (session["user_id"],))
-    complaints = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    # Fetch user's complaints for dropdown
+    complaints = list(db.complaints.find({"user_id": session["user_id"]}).sort("created_at", -1))
+    for c in complaints:
+        c["id"] = str(c["_id"])
 
     return render_template("feedback.html", feedbacks=feedbacks, complaints=complaints)
 
@@ -698,48 +646,69 @@ def admin_feedback():
     if "user_id" not in session or session.get("role") != "admin":
         return redirect(url_for("login"))
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
     # Handle admin reply
     if request.method == "POST":
         feedback_id = request.form["feedback_id"]
         reply_msg = request.form["reply"].strip()
 
-        cursor.execute("""
-            UPDATE feedback
-            SET admin_reply=%s, replied_at=NOW()
-            WHERE id=%s
-        """, (reply_msg, feedback_id))
-        conn.commit()
+        db.feedback.update_one(
+            {"_id": ObjectId(feedback_id)},
+            {"$set": {
+                "admin_reply": reply_msg,
+                "replied_at": datetime.now().isoformat()
+            }}
+        )
         flash(_("reply_sent_successfully"), "success")
 
-    # Fetch all feedbacks
-    cursor.execute("""
-        SELECT f.*, u.name AS user_name, c.title AS complaint_title
-        FROM feedback f
-        JOIN users u ON f.user_id = u.id
-        LEFT JOIN complaints c ON f.complaint_id = c.id
-        ORDER BY f.created_at DESC
-    """)
-    all_feedbacks = cursor.fetchall()
+    # Fetch all feedbacks with user and complaint info
+    all_feedbacks = list(db.feedback.aggregate([
+        {"$lookup": {
+            "from": "users",
+            "let": {"user_id_str": "$user_id"},
+            "pipeline": [
+                {"$addFields": {"id_str": {"$toString": "$_id"}}},
+                {"$match": {"$expr": {"$eq": ["$id_str", "$$user_id_str"]}}}
+            ],
+            "as": "user_info"
+        }},
+        {"$lookup": {
+            "from": "complaints",
+            "let": {"complaint_id": "$complaint_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$complaint_id"]}}}
+            ],
+            "as": "complaint_info"
+        }},
+        {"$unwind": {"path": "$user_info", "preserveNullAndEmptyArrays": True}},
+        {"$unwind": {"path": "$complaint_info", "preserveNullAndEmptyArrays": True}},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "user_name": "$user_info.name",
+            "complaint_title": "$complaint_info.title"
+        }},
+        {"$sort": {"created_at": -1}}
+    ]))
 
     # Get rating analytics
-    cursor.execute("""
-        SELECT 
-            ROUND(AVG(rating), 1) AS avg_rating, 
-            COUNT(*) AS total_feedback,
-            SUM(CASE WHEN rating=5 THEN 1 ELSE 0 END) AS five_star,
-            SUM(CASE WHEN rating=4 THEN 1 ELSE 0 END) AS four_star,
-            SUM(CASE WHEN rating=3 THEN 1 ELSE 0 END) AS three_star,
-            SUM(CASE WHEN rating=2 THEN 1 ELSE 0 END) AS two_star,
-            SUM(CASE WHEN rating=1 THEN 1 ELSE 0 END) AS one_star
-        FROM feedback
-    """)
-    analytics = cursor.fetchone()
-
-    cursor.close()
-    conn.close()
+    analytics_data = list(db.feedback.aggregate([
+        {"$group": {
+            "_id": None,
+            "avg_rating": {"$avg": "$rating"},
+            "total_feedback": {"$sum": 1},
+            "five_star": {"$sum": {"$cond": [{"$eq": ["$rating", "5"]}, 1, 0]}},
+            "four_star": {"$sum": {"$cond": [{"$eq": ["$rating", "4"]}, 1, 0]}},
+            "three_star": {"$sum": {"$cond": [{"$eq": ["$rating", "3"]}, 1, 0]}},
+            "two_star": {"$sum": {"$cond": [{"$eq": ["$rating", "2"]}, 1, 0]}},
+            "one_star": {"$sum": {"$cond": [{"$eq": ["$rating", "1"]}, 1, 0]}}
+        }}
+    ]))
+    
+    analytics = analytics_data[0] if analytics_data else {
+        "avg_rating": 0, "total_feedback": 0,
+        "five_star": 0, "four_star": 0, "three_star": 0, "two_star": 0, "one_star": 0
+    }
 
     return render_template("admin_feedback.html", feedbacks=all_feedbacks, analytics=analytics)
 
@@ -753,12 +722,10 @@ def dept_admin_login():
         username = request.form.get("username")
         password = request.form.get("password")
 
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM department_admins WHERE username=%s", (username,))
-        dept_admin = cursor.fetchone()
-        cursor.close()
-        conn.close()
+        db = get_db()
+        dept_admin = db.dept_admins.find_one({"username": username})
+        if dept_admin:
+            dept_admin["id"] = str(dept_admin["_id"])
 
         if dept_admin and check_password_hash(dept_admin["password"], password):
             session["dept_admin_id"] = dept_admin["id"]
@@ -785,71 +752,82 @@ def dept_admin_dashboard():
     department = session.get("department")
     admin_name = session.get("dept_admin_name")
 
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
-    # Fetch complaints for this department
-    cursor.execute("""
-        SELECT 
-            c.*, 
-            u.name AS user_name,
-            w.name AS assigned_worker_name,
-            w.phone AS assigned_worker_phone
-        FROM complaints c
-        JOIN users u ON c.user_id = u.id
-        LEFT JOIN workers w ON c.assigned_worker_id = w.id
-        WHERE c.department = %s
-        ORDER BY c.created_at DESC
-    """, (department,))
-    complaints = cursor.fetchall()
+    # Fetch complaints for this department with user and worker info
+    complaints = list(db.complaints.aggregate([
+        {"$match": {"department": department}},
+        {"$lookup": {
+            "from": "users",
+            "let": {"user_id_str": "$user_id"},
+            "pipeline": [
+                {"$addFields": {"id_str": {"$toString": "$_id"}}},
+                {"$match": {"$expr": {"$eq": ["$id_str", "$$user_id_str"]}}}
+            ],
+            "as": "user_info"
+        }},
+        {"$lookup": {
+            "from": "workers",
+            "let": {"worker_id": "$assigned_worker_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$worker_id"]}}}
+            ],
+            "as": "worker_info"
+        }},
+        {"$unwind": {"path": "$user_info", "preserveNullAndEmptyArrays": True}},
+        {"$unwind": {"path": "$worker_info", "preserveNullAndEmptyArrays": True}},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "user_name": "$user_info.name",
+            "assigned_worker_name": "$worker_info.name",
+            "assigned_worker_phone": "$worker_info.phone"
+        }},
+        {"$sort": {"created_at": -1}}
+    ]))
 
     # Statistics
-    cursor.execute("SELECT COUNT(*) AS total FROM complaints WHERE department=%s", (department,))
-    total = cursor.fetchone()["total"]
+    total = db.complaints.count_documents({"department": department})
+    pending = db.complaints.count_documents({"department": department, "status": "Pending"})
+    in_progress = db.complaints.count_documents({"department": department, "status": "In Progress"})
+    resolved = db.complaints.count_documents({"department": department, "status": "Resolved"})
 
-    cursor.execute("SELECT COUNT(*) AS pending FROM complaints WHERE department=%s AND status='Pending'", (department,))
-    pending = cursor.fetchone()["pending"]
+    # Fetch workers for this department with complaint counts
+    workers = list(db.workers.aggregate([
+        {"$match": {"department": department}},
+        {"$lookup": {
+            "from": "complaints",
+            "let": {"worker_id_str": {"$toString": "$_id"}},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": ["$assigned_worker_id", "$$worker_id_str"]}}}
+            ],
+            "as": "complaints"
+        }},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "complaint_count": {"$size": "$complaints"}
+        }},
+        {"$project": {"complaints": 0}},
+        {"$sort": {"name": 1}}
+    ]))
 
-    cursor.execute("SELECT COUNT(*) AS in_progress FROM complaints WHERE department=%s AND status='In Progress'", (department,))
-    in_progress = cursor.fetchone()["in_progress"]
-
-    cursor.execute("SELECT COUNT(*) AS resolved FROM complaints WHERE department=%s AND status='Resolved'", (department,))
-    resolved = cursor.fetchone()["resolved"]
-
-    # Fetch workers for this department
-    cursor.execute("""
-        SELECT w.*, COUNT(c.id) as complaint_count
-        FROM workers w
-        LEFT JOIN complaints c ON w.id = c.assigned_worker_id
-        WHERE w.department = %s
-        GROUP BY w.id
-        ORDER BY w.name
-    """, (department,))
-    workers = cursor.fetchall()
-
-    # Monthly trend data (last 6 months)
-    cursor.execute("""
-        SELECT 
-            DATE_FORMAT(created_at, '%%b') as month,
-            COUNT(*) as count
-        FROM complaints
-        WHERE department = %s
-        AND created_at >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(created_at, '%%Y-%%m'), DATE_FORMAT(created_at, '%%b')
-        ORDER BY DATE_FORMAT(created_at, '%%Y-%%m')
-    """, (department,))
-    trend_data_raw = cursor.fetchall()
+    # Monthly trend data (simplified - last 6 months)
+    trend_data_raw = list(db.complaints.aggregate([
+        {"$match": {"department": department}},
+        {"$group": {
+            "_id": {"$substr": ["$created_at", 0, 7]},
+            "count": {"$sum": 1}
+        }},
+        {"$sort": {"_id": 1}},
+        {"$limit": 6}
+    ]))
     
-    trend_labels = [row["month"] for row in trend_data_raw]
-    trend_data = [row["count"] for row in trend_data_raw]
+    trend_labels = [d["_id"] for d in trend_data_raw]
+    trend_data = [d["count"] for d in trend_data_raw]
 
     # Format timestamps
     for c in complaints:
         if isinstance(c.get("created_at"), datetime):
             c["created_at"] = c["created_at"].strftime("%Y-%m-%d %H:%M")
-
-    cursor.close()
-    conn.close()
 
     return render_template(
         "dept_admin_dashboard.html",
@@ -879,23 +857,18 @@ def dept_update_status(complaint_id):
         flash("Invalid status selected", "danger")
         return redirect(url_for("dept_admin_dashboard"))
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    db = get_db()
     
     if remarks:
-        cursor.execute(
-            "UPDATE complaints SET status=%s, remarks=%s WHERE id=%s",
-            (new_status, remarks, complaint_id)
+        db.complaints.update_one(
+            {"_id": ObjectId(complaint_id)},
+            {"$set": {"status": status, "remarks": remarks}}
         )
     else:
-        cursor.execute(
-            "UPDATE complaints SET status=%s WHERE id=%s",
-            (new_status, complaint_id)
+        db.complaints.update_one(
+            {"_id": ObjectId(complaint_id)},
+            {"$set": {"status": new_status}}
         )
-    
-    conn.commit()
-    cursor.close()
-    conn.close()
 
     flash(f"Complaint #{complaint_id} updated to {new_status}", "success")
     return redirect(url_for("dept_admin_dashboard"))
@@ -918,15 +891,11 @@ def dept_upload_admin_image(complaint_id):
     image_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     image_file.save(image_path)
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE complaints SET admin_image=%s WHERE id=%s",
-        (filename, complaint_id)
+    db = get_db()
+    db.complaints.update_one(
+        {"_id": ObjectId(complaint_id)},
+        {"$set": {"admin_image": filename}}
     )
-    conn.commit()
-    cursor.close()
-    conn.close()
 
     flash("Admin image uploaded successfully!", "success")
     return redirect(url_for("dept_admin_dashboard"))
@@ -943,27 +912,26 @@ def dept_add_worker():
     department = request.form['department']
     complaint_id = request.form['complaint_id']
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    db = get_db()
 
     # Insert new worker
-    cursor.execute("""
-        INSERT INTO workers (name, phone, department)
-        VALUES (%s, %s, %s)
-    """, (name, phone, department))
-
-    worker_id = cursor.lastrowid
+    result = db.workers.insert_one({
+        "name": name,
+        "phone": phone,
+        "department": department,
+        "created_at": datetime.now().isoformat()
+    })
+    worker_id = str(result.inserted_id)
 
     # Assign worker to complaint
-    cursor.execute("""
-        UPDATE complaints 
-        SET assigned_worker_id = %s
-        WHERE id = %s
-    """, (worker_id, complaint_id))
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    db.complaints.update_one(
+        {"_id": ObjectId(complaint_id)},
+        {"$set": {
+            "assigned_worker_id": worker_id,
+            "assigned_worker_name": name,
+            "assigned_worker_phone": phone
+        }}
+    )
 
     flash("Worker assigned successfully!", "success")
     return redirect(url_for('dept_admin_dashboard'))
@@ -977,35 +945,51 @@ def dept_admin_feedback():
 
     department = session.get("department")
     
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
+    db = get_db()
 
     # Handle reply
     if request.method == "POST":
         feedback_id = request.form["feedback_id"]
         reply_msg = request.form["reply"].strip()
 
-        cursor.execute("""
-            UPDATE feedback
-            SET admin_reply=%s, replied_at=NOW()
-            WHERE id=%s
-        """, (reply_msg, feedback_id))
-        conn.commit()
+        db.feedback.update_one(
+            {"_id": ObjectId(feedback_id)},
+            {"$set": {
+                "admin_reply": reply_msg,
+                "replied_at": datetime.now().isoformat()
+            }}
+        )
         flash("Reply sent successfully!", "success")
 
     # Fetch feedbacks related to this department's complaints
-    cursor.execute("""
-        SELECT f.*, u.name AS user_name, c.title AS complaint_title
-        FROM feedback f
-        JOIN users u ON f.user_id = u.id
-        LEFT JOIN complaints c ON f.complaint_id = c.id
-        WHERE c.department = %s OR f.complaint_id IS NULL
-        ORDER BY f.created_at DESC
-    """, (department,))
-    feedbacks = cursor.fetchall()
-
-    cursor.close()
-    conn.close()
+    feedbacks = list(db.feedback.aggregate([
+        {"$lookup": {
+            "from": "users",
+            "let": {"user_id_str": "$user_id"},
+            "pipeline": [
+                {"$addFields": {"id_str": {"$toString": "$_id"}}},
+                {"$match": {"$expr": {"$eq": ["$id_str", "$$user_id_str"]}}}
+            ],
+            "as": "user_info"
+        }},
+        {"$lookup": {
+            "from": "complaints",
+            "let": {"complaint_id": "$complaint_id"},
+            "pipeline": [
+                {"$match": {"$expr": {"$eq": [{"$toString": "$_id"}, "$$complaint_id"]}}},
+                {"$match": {"department": department}}
+            ],
+            "as": "complaint_info"
+        }},
+        {"$unwind": {"path": "$user_info", "preserveNullAndEmptyArrays": True}},
+        {"$unwind": {"path": "$complaint_info", "preserveNullAndEmptyArrays": True}},
+        {"$addFields": {
+            "id": {"$toString": "$_id"},
+            "user_name": "$user_info.name",
+            "complaint_title": "$complaint_info.title"
+        }},
+        {"$sort": {"created_at": -1}}
+    ]))
 
     return render_template("admin_feedback.html", feedbacks=feedbacks, analytics=None)
 
