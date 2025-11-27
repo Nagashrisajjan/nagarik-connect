@@ -50,6 +50,45 @@ Thumbs.db
 *.sqlite
 *.sqlite3
 
-# Uploads (optional - remove if you want to keep uploads in git)
-# static/uploads/*
-# !static/uploads/.gitkeep
+# ML Models (large files)
+ml/models/
+ml/*.h5
+ml/*.pkl
+ml/*.joblib
+ml/*.sav
+ml/*.safetensors
+ml/model.safetensors
+*.h5
+*.pkl
+*.joblib
+*.sav
+*.safetensors
+model.safetensors
+
+# Node modules
+node_modules/
+netlify-frontend/node_modules/
+
+# Uploads
+static/uploads/*
+!static/uploads/.gitkeep
+
+# Backup files
+*.backup
+*.backup_*
+app.py.backup*
+
+# Test files
+test_*.py
+check_*.py
+*_fix.py
+apply_fix.py
+
+# Documentation (keep only essential)
+DEBUG_INSTRUCTIONS.txt
+DEPLOYMENT_READY.txt
+FINAL_STATUS.txt
+SERVER_READY.txt
+TEST_NOW.txt
+WORK_COMPLETED.md
+ALL_CREDENTIALS.txt
