@@ -50,6 +50,29 @@ def get_workers():
 
 
 # ---- LANDING PAGE ----
+# ---- DEBUG ROUTE (Remove in production) ----
+@app.route("/debug/admins")
+def debug_admins():
+    """Debug endpoint to check department admins"""
+    db = get_db()
+    admins = db.dept_admins.find()
+    
+    result = {
+        "total_admins": len(admins),
+        "admins": []
+    }
+    
+    for admin in admins:
+        result["admins"].append({
+            "id": admin.get("id"),
+            "username": admin.get("username"),
+            "name": admin.get("name"),
+            "department": admin.get("department"),
+            "has_password": "password" in admin and len(admin.get("password", "")) > 0
+        })
+    
+    return result
+
 @app.route("/", endpoint="home")
 def landing():
     # Initialize language session if not set
