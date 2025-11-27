@@ -1,9 +1,14 @@
 import os
-import torch
-import joblib
 
-# Dept model: DistilBERT for department classification
-from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+# Try to import ML dependencies, but make them optional
+try:
+    import torch
+    import joblib
+    from transformers import DistilBertTokenizer, DistilBertForSequenceClassification
+    ML_AVAILABLE = True
+except ImportError:
+    ML_AVAILABLE = False
+    print("⚠️ ML libraries not installed - using fallback predictions")
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -12,28 +17,44 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ==========================================
 DEPT_MODEL_DIR = os.path.join(BASE_DIR, "model")
 
-try:
-    dept_tokenizer = DistilBertTokenizer.from_pretrained(DEPT_MODEL_DIR)
-    dept_model = DistilBertForSequenceClassification.from_pretrained(
-        DEPT_MODEL_DIR,
-        use_safetensors=True  # Explicitly use safetensors format
-    )
-    dept_model.eval()
-    dept_label_encoder = joblib.load(os.path.join(DEPT_MODEL_DIR, "label_encoder.joblib"))
-    print("✅ ML Model loaded successfully!")
-except Exception as e:
-    print(f"⚠️ ML Model loading error: {e}")
-    dept_tokenizer = None
-    dept_model = None
-    dept_label_encoder = None
+dept_tokenizer = None
+dept_model = None
+dept_label_encoder = None
+
+if ML_AVAILABLE:
+    try:
+        dept_tokenizer = DistilBertTokenizer.from_pretrained(DEPT_MODEL_DIR)
+        dept_model = DistilBertForSequenceClassification.from_pretrained(
+            DEPT_MODEL_DIR,
+            use_safetensors=True
+        )
+        dept_model.eval()
+        dept_label_encoder = joblib.load(os.path.join(DEPT_MODEL_DIR, "label_encoder.joblib"))
+        print("✅ ML Model loaded successfully!")
+    except Exception as e:
+        print(f"⚠️ ML Model loading error: {e}")
+        dept_tokenizer = None
+        dept_model = None
+        dept_label_encoder = None
 
 
 def predict_department(title: str, description: str) -> str:
     """Return department string predicted from title+description."""
-    # Fallback if model not loaded
-    if dept_model is None or dept_tokenizer is None or dept_label_encoder is None:
+    # Fallback if model not loaded or ML not available
+    if not ML_AVAILABLE or dept_model is None or dept_tokenizer is None or dept_label_encoder is None:
         print("⚠️ ML Model not available, using fallback")
-        return "General Department"
+        # Simple keyword-based fallback
+        text = f"{title} {description}".lower()
+        if any(word in text for word in ["water", "pipe", "leak", "tap", "supply"]):
+            return "Water Crisis"
+        elif any(word in text for word in ["road", "pothole", "street", "highway"]):
+            return "Road Maintenance(Engg)"
+        elif any(word in text for word in ["garbage", "waste", "trash", "dustbin"]):
+            return "Solid Waste (Garbage) Related"
+        elif any(word in text for word in ["light", "electric", "power", "street light"]):
+            return "Electrical"
+        else:
+            return "General Department"
     
     try:
         text = f"{title} - {description}"
