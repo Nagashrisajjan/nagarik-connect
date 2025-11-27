@@ -76,12 +76,78 @@ def debug_admins():
 @app.route("/setup/create-admins")
 def setup_create_admins():
     """Manually create department admins"""
-    from database_sqlite import create_default_dept_admins
+    from werkzeug.security import generate_password_hash
+    import sqlite3
+    
     try:
-        create_default_dept_admins()
-        return {"status": "success", "message": "Department admins created/checked"}
+        # Force create admins directly
+        conn = sqlite3.connect("icgs_complaints.db")
+        cursor = conn.cursor()
+        
+        # Check existing
+        cursor.execute("SELECT COUNT(*) FROM dept_admins")
+        existing_count = cursor.fetchone()[0]
+        
+        if existing_count == 0:
+            # Create admins
+            admins = [
+                ("Water Department Admin", "water_admin", generate_password_hash("water123"), "Water Crisis"),
+                ("Road Department Admin", "road_admin", generate_password_hash("road123"), "Road Maintenance(Engg)"),
+                ("Garbage Department Admin", "garbage_admin", generate_password_hash("garbage123"), "Solid Waste (Garbage) Related"),
+                ("Electrical Department Admin", "electrical_admin", generate_password_hash("electrical123"), "Electrical"),
+                ("General Department Admin", "general_admin", generate_password_hash("general123"), "General Department")
+            ]
+            
+            for admin in admins:
+                cursor.execute(
+                    "INSERT INTO dept_admins (name, username, password, department) VALUES (?, ?, ?, ?)",
+                    admin
+                )
+            
+            conn.commit()
+            conn.close()
+            return {"status": "success", "message": f"Created 5 department admins"}
+        else:
+            conn.close()
+            return {"status": "success", "message": f"Admins already exist ({existing_count} found)"}
+            
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        return {"status": "error", "message": str(e), "type": type(e).__name__}
+
+@app.route("/setup/reset-admins")
+def setup_reset_admins():
+    """Delete and recreate all department admins"""
+    from werkzeug.security import generate_password_hash
+    import sqlite3
+    
+    try:
+        conn = sqlite3.connect("icgs_complaints.db")
+        cursor = conn.cursor()
+        
+        # Delete all existing admins
+        cursor.execute("DELETE FROM dept_admins")
+        
+        # Create fresh admins
+        admins = [
+            ("Water Department Admin", "water_admin", generate_password_hash("water123"), "Water Crisis"),
+            ("Road Department Admin", "road_admin", generate_password_hash("road123"), "Road Maintenance(Engg)"),
+            ("Garbage Department Admin", "garbage_admin", generate_password_hash("garbage123"), "Solid Waste (Garbage) Related"),
+            ("Electrical Department Admin", "electrical_admin", generate_password_hash("electrical123"), "Electrical"),
+            ("General Department Admin", "general_admin", generate_password_hash("general123"), "General Department")
+        ]
+        
+        for admin in admins:
+            cursor.execute(
+                "INSERT INTO dept_admins (name, username, password, department) VALUES (?, ?, ?, ?)",
+                admin
+            )
+        
+        conn.commit()
+        conn.close()
+        return {"status": "success", "message": f"Reset complete! Created 5 fresh department admins"}
+        
+    except Exception as e:
+        return {"status": "error", "message": str(e), "type": type(e).__name__}
 
 @app.route("/", endpoint="home")
 def landing():
